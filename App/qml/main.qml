@@ -126,10 +126,24 @@ ApplicationWindow {
 
     FileDialog {
         id: fileDialog
+        property bool saveMode: false
+        property string defaultName: ""
         folder: viewcontroller.folder==="" ? shortcuts.home : viewcontroller.folder
+        selectExisting: !saveMode
+        selectMultiple: false
+        nameFilters: ["Fichiers CSV (*.csv)", "Tous les fichiers (*)"]
         onAccepted: {
             viewcontroller.setFolder(fileDialog.fileUrls)
-            viewcontroller.selectedFilePath(fileDialog.fileUrls)
+            // Convertir l'URL en chemin de fichier local
+            var filePath = fileDialog.fileUrls[0].toString()
+            if (filePath.startsWith("file:///")) {
+                filePath = filePath.substring(8) // Enlever "file:///"
+            } else if (filePath.startsWith("file://")) {
+                filePath = filePath.substring(7) // Enlever "file://"
+            }
+            // Remplacer les slashes par des backslashes sur Windows
+            filePath = filePath.replace(/\//g, "\\")
+            viewcontroller.selectedFilePath(filePath)
         }
         onRejected: viewcontroller.selectedFilePath("")
 
@@ -140,6 +154,7 @@ ApplicationWindow {
         onPopFileChooser: {
             fileDialog.title = title
             fileDialog.nameFilters = nameFilters
+            fileDialog.saveMode = saveMode
             fileDialog.open()
         }
         onToast: {

@@ -2,6 +2,7 @@
 #include <QQmlEngine>
 #include <QDebug>
 #include <QSettings>
+#include <QDateTime>
 #include "global.h"
 
 ViewController::ViewController(const QStringList& hostList, int requestedTcpPort) : QObject(),
@@ -132,7 +133,7 @@ void ViewController::openFileChooser(FileChooser *data) {
     }
     _fileChooserOpened = true;
     _fileChooser = data;
-    emit popFileChooser(_fileChooser->title(), _fileChooser->nameFilters());
+    emit popFileChooser(_fileChooser->title(), _fileChooser->nameFilters(), _fileChooser->saveMode());
 
 }
 
@@ -307,6 +308,23 @@ void ViewController::configureGateCount() {
     });
     
     openDialogBox(dialogBox);
+}
+
+void ViewController::exportAllData() {
+    // Suggérer un nom de fichier par défaut avec timestamp
+    QString defaultName = QString("export_competition_%0.csv")
+                          .arg(QDateTime::currentDateTime().toString("yyyy-MM-dd_hh-mm-ss"));
+    
+    FileChooser* fileChooser = new FileChooser("Exporter toutes les données", 
+                                               QStringList() << "Fichiers CSV (*.csv)" << "Tous les fichiers (*)",
+                                               true); // Mode enregistrement
+    fileChooser->onSelectedFilePath([this, fileChooser](QString filePath) {
+        qDebug() << "Selected export file path: " << filePath;
+        fileChooser->deleteLater();
+        emit requestExportAllData(filePath);
+    });
+    
+    openFileChooser(fileChooser);
 }
 
 void ViewController::tcpServerStarFailure() {

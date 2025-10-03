@@ -38,11 +38,12 @@ signals:
     void statusTextChanged(QString statusText);
     void quit();
     void popup(QObject* dialogBox);
-    void popFileChooser(QString title, QStringList nameFilters);
+    void popFileChooser(QString title, QStringList nameFilters, bool saveMode = false);
     void requestPCE(QString filename, bool reset);
     void requestTXT(QString filename, bool reset);
     void requestPenaltyClear();
     void requestChronoClear();
+    void requestExportAllData(QString filename);
     void toast(QString text, int delay); // delay in msec
     void requestTcpServer(QString host, int port);
     void selectedAddress(QString host);
@@ -74,6 +75,7 @@ public slots:
     void clearPenalties();
     void clearChronos();
     void configureGateCount();
+    void exportAllData();
     void printError(const QString& title, const QString& message);
     void broadcastError();
     void setTcpPort(int tcpPort);

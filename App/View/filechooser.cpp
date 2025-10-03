@@ -1,8 +1,9 @@
 #include "filechooser.h"
 
-FileChooser::FileChooser(const QString &title, QStringList nameFilters) : QObject(),
+FileChooser::FileChooser(const QString &title, QStringList nameFilters, bool saveMode) : QObject(),
     _title(title),
-    _nameFilters(nameFilters)
+    _nameFilters(nameFilters),
+    _saveMode(saveMode)
 {
 
 }

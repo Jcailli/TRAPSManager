@@ -54,6 +54,7 @@ signals:
     void toast(QString text, int delay);
     void bibCountChanged(int);
     void gateCountChanged(int gateCount);
+    void exportCompleted(QString filename);
     // used to send data to third parties
     void penaltyReceived(int bib, int gateId, int value); // bib, gate, value
     void chronoReceived(int bib, int value); // bib, value
@@ -65,6 +66,7 @@ public slots:
     void processIncomingStartTime(int bibnumber, qint64 startTime);
     void processIncomingFinishTime(int bibnumber, qint64 finishTime);
     void processIncomingLapTime(int bibnumber, int lap, qint64 time);
+    void exportAllData(const QString& filename);
 
     void selectPenalty(int bibIndex, int gateIndex);
     void setScheduling(int criteria);

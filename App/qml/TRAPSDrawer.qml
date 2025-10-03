@@ -19,6 +19,7 @@ Drawer {
             ListElement { functionName: "Effacer pénalités"; functionId: 8 }
             ListElement { functionName: "Effacer chronos"; functionId: 9 }
             ListElement { functionName: "Configurer nombre de portes"; functionId: 10 }
+            ListElement { functionName: "Exporter toutes les données"; functionId: 11 }
             ListElement { functionName: "Police plus grande (CTRL +)"; functionId: 3 }
             ListElement { functionName: "Police plus petite (CTRL -)"; functionId: 4 }
             ListElement { functionName: "A propos"; functionId: 5 }
@@ -75,6 +76,11 @@ Drawer {
                     case 10: {
                         drawer.close();
                         viewcontroller.configureGateCount();
+                        break;
+                    }
+                    case 11: {
+                        drawer.close();
+                        viewcontroller.exportAllData();
                         break;
                     }
 

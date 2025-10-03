@@ -127,6 +127,7 @@ int main(int argc, char *argv[]) {
     QObject::connect(&viewController, &ViewController::requestTXT, &bibList, &BibList::processTXT);
     QObject::connect(&viewController, &ViewController::requestPenaltyClear, &bibList, &BibList::clearPenalties);
     QObject::connect(&viewController, &ViewController::requestChronoClear, &bibList, &BibList::clearChronos);
+    QObject::connect(&viewController, &ViewController::requestExportAllData, &bibList, &BibList::exportAllData);
 
     // ViewController - TCPServer
     QObject::connect(&viewController, &ViewController::requestTcpServer, &tcpServer, &TCPServer::start);

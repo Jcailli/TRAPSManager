@@ -5,6 +5,8 @@
 #include <QSettings>
 #include <QFile>
 #include <QTextStream>
+#include <QFileInfo>
+#include <QDir>
 #include <algorithm>
 #include "Database/database.h"
 
@@ -558,5 +560,143 @@ QHash<int, QByteArray> BibList::roleNames() const {
     hash.insert(BibList::BibRunningTime, BIB_RUNNINGTIME_NAME);
     hash.insert(BibList::BibLocked, BIB_LOCKED_NAME);
     return hash;
+}
+
+void BibList::exportAllData(const QString& filename) {
+    qDebug() << "Exporting all data to:" << filename;
+    
+    // Vérifier que le chemin n'est pas vide
+    if (filename.isEmpty()) {
+        emit error("Export impossible", "Aucun fichier sélectionné");
+        return;
+    }
+    
+    // Nettoyer le chemin de fichier (enlever les préfixes file://)
+    QString cleanFilename = filename;
+    if (cleanFilename.startsWith("file:///")) {
+        cleanFilename = cleanFilename.mid(8);
+    } else if (cleanFilename.startsWith("file://")) {
+        cleanFilename = cleanFilename.mid(7);
+    }
+    
+    qDebug() << "Cleaned filename:" << cleanFilename;
+    
+    // Vérifier que le répertoire parent existe
+    QFileInfo fileInfo(cleanFilename);
+    QDir parentDir = fileInfo.absoluteDir();
+    if (!parentDir.exists()) {
+        emit error("Export impossible", QString("Le répertoire n'existe pas:\n%0").arg(parentDir.absolutePath()));
+        return;
+    }
+    
+    // Vérifier les permissions d'écriture en testant la création d'un fichier temporaire
+    QFile testFile(parentDir.absoluteFilePath("test_write_permission.tmp"));
+    if (testFile.open(QFile::WriteOnly)) {
+        testFile.close();
+        testFile.remove(); // Supprimer le fichier de test
+    } else {
+        emit error("Export impossible", QString("Pas de permission d'écriture dans:\n%0").arg(parentDir.absolutePath()));
+        return;
+    }
+    
+    QFile file(cleanFilename);
+    if (!file.open(QFile::WriteOnly | QFile::Text)) {
+        emit error("Export impossible", QString("Impossible de créer le fichier\n%0\nErreur: %1").arg(cleanFilename).arg(file.errorString()));
+        return;
+    }
+    
+    QTextStream out(&file);
+    out.setCodec("UTF-8");
+    
+    // En-tête CSV avec BOM pour Excel
+    out << "\xEF\xBB\xBF"; // BOM UTF-8
+    
+    // En-tête CSV
+    QStringList header;
+    header << "Dossard" << "Catégorie" << "Horaire" << "Départ" << "Arrivée" << "Temps";
+    
+    // Ajouter les colonnes des portes
+    for (int gate = 1; gate <= _gateCount; gate++) {
+        header << QString("Porte%0").arg(gate);
+    }
+    
+    header << "Statut";
+    out << header.join(",") << "\n";
+    
+    // Données pour chaque dossard
+    for (int i = 0; i < _bibList.count(); i++) {
+        Bib* bib = _bibList.at(i);
+        if (!bib) continue;
+        
+        QStringList row;
+        
+        // Informations de base - forcer le format texte
+        row << bib->id();
+        row << bib->categ();
+        row << bib->schedule();
+        
+        // Format des heures en texte lisible - forcer le format texte
+        QString startTime = bib->startTimeStr();
+        if (startTime.isEmpty() || startTime == "-") {
+            startTime = "";
+        } else {
+            // Forcer le format texte avec un préfixe pour éviter l'interprétation comme date
+            startTime = "'" + startTime;
+        }
+        row << startTime;
+        
+        QString finishTime = bib->finishTimeStr();
+        if (finishTime.isEmpty() || finishTime == "-") {
+            finishTime = "";
+        } else {
+            // Forcer le format texte avec un préfixe pour éviter l'interprétation comme date
+            finishTime = "'" + finishTime;
+        }
+        row << finishTime;
+        
+        // Format du temps de course en texte lisible
+        QString runningTime = bib->runningTimeStr();
+        if (runningTime.isEmpty() || runningTime == "-") {
+            runningTime = "";
+        } else {
+            // Forcer le format texte avec un préfixe pour éviter l'interprétation comme date
+            runningTime = "'" + runningTime;
+        }
+        row << runningTime;
+        
+        // Pénalités par porte - format texte
+        for (int gate = 1; gate <= _gateCount; gate++) {
+            Penalty penalty = bib->penaltyAtGate(gate);
+            if (penalty.value() >= 0) {
+                row << QString::number(penalty.value());
+            } else {
+                row << "0";
+            }
+        }
+        
+        // Statut
+        row << (bib->locked() ? "Verrouillé" : "Libre");
+        
+        // Joindre les données avec des guillemets pour éviter les problèmes d'interprétation
+        QStringList quotedRow;
+        foreach (const QString &field, row) {
+            // Échapper les guillemets et entourer de guillemets si nécessaire
+            QString escapedField = field;
+            escapedField.replace("\"", "\"\"");
+            
+            // Toujours entourer de guillemets pour forcer le format texte
+            if (!escapedField.isEmpty()) {
+                escapedField = "\"" + escapedField + "\"";
+            }
+            quotedRow << escapedField;
+        }
+        
+        out << quotedRow.join(",") << "\n";
+    }
+    
+    file.close();
+    emit exportCompleted(filename);
+    emit toast(QString("Export terminé: %0 dossards exportés").arg(_bibList.count()), 3000);
+    qDebug() << "Export completed successfully";
 }
 
