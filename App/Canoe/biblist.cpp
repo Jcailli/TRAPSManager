@@ -26,7 +26,9 @@ BibList::BibList() : QAbstractListModel(),
     QSettings settings;
     _scheduling = settings.value("scheduling").toInt();
     _gateCount = settings.value("gateCount", QVariant(25)).toInt();
-    Bib::setGateCount(_gateCount); // Initialiser Bib avec le nombre de portes
+    Bib::setGateCount(_gateCount);
+    
+ // Initialiser Bib avec le nombre de portes
 
     reloadFromDataBase();
 }
@@ -502,6 +504,7 @@ void BibList::reloadFromDataBase() {
     endResetModel();
     rebuildPenaltyList();
     emit bibCountChanged(_bibList.count());
+    
 }
 
 void BibList::orderBibList() {
@@ -581,6 +584,11 @@ void BibList::exportAllData(const QString& filename) {
     
     qDebug() << "Cleaned filename:" << cleanFilename;
     
+    // Vérifier le mode de compétition
+    QSettings settings;
+    int competitionMode = settings.value("competitionMode", QVariant(0)).toInt();
+    qDebug() << "Competition mode:" << competitionMode;
+    
     // Vérifier que le répertoire parent existe
     QFileInfo fileInfo(cleanFilename);
     QDir parentDir = fileInfo.absoluteDir();
@@ -611,22 +619,31 @@ void BibList::exportAllData(const QString& filename) {
     // En-tête CSV avec BOM pour Excel
     out << "\xEF\xBB\xBF"; // BOM UTF-8
     
-    // En-tête CSV
+    // En-tête CSV selon le mode
     QStringList header;
-    header << "Dossard" << "Catégorie" << "Horaire" << "Départ" << "Arrivée" << "Temps";
-    
-    // Ajouter les colonnes des portes
-    for (int gate = 1; gate <= _gateCount; gate++) {
-        header << QString("Porte%0").arg(gate);
+    if (competitionMode == 0) {
+        // Mode individuel
+        header << "Dossard" << "Catégorie" << "Horaire" << "Départ" << "Arrivée" << "Temps";
+        for (int gate = 1; gate <= _gateCount; gate++) {
+            header << QString("Porte%0").arg(gate);
+        }
+        header << "Statut";
+    } else {
+        // Mode patrouille
+        header << "Patrouille" << "Coureur1" << "Coureur2" << "Coureur3" << "Départ" << "Arrivée" << "Temps" << "Écart(s)" << "Pénalité Écart";
+        for (int gate = 1; gate <= _gateCount; gate++) {
+            header << QString("Porte%0").arg(gate);
+        }
+        header << "Statut";
     }
     
-    header << "Statut";
     out << header.join(",") << "\n";
     
-    // Données pour chaque dossard
-    for (int i = 0; i < _bibList.count(); i++) {
-        Bib* bib = _bibList.at(i);
-        if (!bib) continue;
+    if (competitionMode == 0) {
+        // Export mode individuel
+        for (int i = 0; i < _bibList.count(); i++) {
+            Bib* bib = _bibList.at(i);
+            if (!bib) continue;
         
         QStringList row;
         
@@ -692,11 +709,87 @@ void BibList::exportAllData(const QString& filename) {
         }
         
         out << quotedRow.join(",") << "\n";
+        }
+    } else {
+        // Export mode patrouille - format simplifié avec colonnes A/B/C
+        for (int i = 0; i < _bibList.count(); i++) {
+            Bib* bib = _bibList.at(i);
+            if (!bib) continue;
+            
+            QStringList row;
+            
+            // Informations de base
+            row << bib->id();
+            row << bib->categ();
+            row << bib->schedule();
+            
+            // Temps de départ
+            QString startTime = "";
+            if (bib->startTime() > 0) {
+                QDateTime startDateTime = QDateTime::fromMSecsSinceEpoch(bib->startTime());
+                startTime = "'" + startDateTime.toString("hh:mm:ss.zzz");
+            }
+            row << startTime;
+            
+            // Temps d'arrivée (pour l'instant, on utilise le temps normal)
+            QString finishTime = "";
+            if (bib->finishTime() > 0) {
+                QDateTime finishDateTime = QDateTime::fromMSecsSinceEpoch(bib->finishTime());
+                finishTime = "'" + finishDateTime.toString("hh:mm:ss.zzz");
+            }
+            row << finishTime;
+            
+            // Temps de course
+            QString runningTime = "";
+            if (bib->runningTime() > 0) {
+                qint64 runningMs = bib->runningTime();
+                int minutes = runningMs / 60000;
+                int seconds = (runningMs % 60000) / 1000;
+                int milliseconds = runningMs % 1000;
+                runningTime = QString("'%0:%1.%2")
+                    .arg(minutes)
+                    .arg(seconds, 2, 10, QChar('0'))
+                    .arg(milliseconds, 3, 10, QChar('0'));
+            }
+            row << runningTime;
+            
+            // Pénalités par porte (format A/B/C)
+            for (int gate = 1; gate <= _gateCount; gate++) {
+                Penalty penalty = bib->penaltyAtGate(gate);
+                if (penalty.value() >= 0) {
+                    row << QString::number(penalty.value());
+                } else {
+                    row << "0";
+                }
+            }
+            
+            // Statut
+            row << (bib->locked() ? "Verrouillé" : "Libre");
+            
+            // Joindre les données avec des guillemets
+            QStringList quotedRow;
+            foreach (const QString &field, row) {
+                QString escapedField = field;
+                escapedField.replace("\"", "\"\"");
+                if (!escapedField.isEmpty()) {
+                    escapedField = "\"" + escapedField + "\"";
+                }
+                quotedRow << escapedField;
+            }
+            
+            out << quotedRow.join(",") << "\n";
+        }
     }
     
     file.close();
     emit exportCompleted(filename);
-    emit toast(QString("Export terminé: %0 dossards exportés").arg(_bibList.count()), 3000);
+    
+    if (competitionMode == 0) {
+        emit toast(QString("Export terminé: %0 dossards exportés").arg(_bibList.count()), 3000);
+    } else {
+        emit toast(QString("Export terminé: %0 dossards exportés (mode patrouille)").arg(_bibList.count()), 3000);
+    }
     qDebug() << "Export completed successfully";
 }
+
 

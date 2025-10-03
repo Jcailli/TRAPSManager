@@ -7,10 +7,19 @@ Rectangle {
     property bool displayTimeData: false
     property int fontSize: 18
     property color bgcolor: "gray"
+    property bool isPatrolMode: viewcontroller.competitionMode === 1
 
     height: fontSize*1.5
 
-    width: displayTimeData?fontSize*21.5+6:fontSize*12.5+3
+    width: {
+        if (isPatrolMode && displayTimeData) {
+            return fontSize*46.5+8 // Plus large pour les colonnes patrouille (8 colonnes fixes)
+        } else if (displayTimeData) {
+            return fontSize*21.5+6
+        } else {
+            return fontSize*12.5+3
+        }
+    }
     color: "white"
 
     Row {
@@ -86,11 +95,62 @@ Rectangle {
                 text: "Départ"
             }
         }
+        // Colonnes spécifiques au mode patrouille - Arrivée1er
         Rectangle {
             color: bgcolor
             height: parent.height
             width: fontSize*7.5
-            visible: displayTimeData
+            visible: displayTimeData && isPatrolMode
+            border.width: 1
+            border.color: "white"
+            Text {
+                anchors.fill: parent
+                verticalAlignment: Text.AlignVCenter
+                horizontalAlignment: Text.AlignHCenter
+                color: "white"
+                font.pixelSize: fontSize*0.7
+                text: "Arrivée 1er"
+            }
+        }
+        // Colonnes spécifiques au mode patrouille - Arrivée3ème
+        Rectangle {
+            color: bgcolor
+            height: parent.height
+            width: fontSize*7.5
+            visible: displayTimeData && isPatrolMode
+            border.width: 1
+            border.color: "white"
+            Text {
+                anchors.fill: parent
+                verticalAlignment: Text.AlignVCenter
+                horizontalAlignment: Text.AlignHCenter
+                color: "white"
+                font.pixelSize: fontSize*0.7
+                text: "Arrivée 3ème"
+            }
+        }
+        // Colonnes spécifiques au mode patrouille - Écart (optionnel)
+        Rectangle {
+            color: bgcolor
+            height: parent.height
+            width: fontSize*4
+            visible: displayTimeData && isPatrolMode
+            border.width: 1
+            border.color: "white"
+            Text {
+                anchors.fill: parent
+                verticalAlignment: Text.AlignVCenter
+                horizontalAlignment: Text.AlignHCenter
+                color: "white"
+                font.pixelSize: fontSize*0.7
+                text: "Écart"
+            }
+        }
+        Rectangle {
+            color: bgcolor
+            height: parent.height
+            width: fontSize*7.5
+            visible: displayTimeData && !isPatrolMode
             border.width: 1
             border.color: "white"
             Text {
@@ -107,11 +167,28 @@ Rectangle {
             color: bgcolor
             height: parent.height
             width: fontSize*7.5
-            visible: displayTimeData
+            visible: displayTimeData && !isPatrolMode
             border.width: 1
             border.color: "white"
             Text {
                 id: elapsedTimeText
+                anchors.fill: parent
+                verticalAlignment: Text.AlignVCenter
+                horizontalAlignment: Text.AlignHCenter
+                color: "white"
+                font.pixelSize: fontSize*0.7
+                text: "Chrono"
+            }
+        }
+        // Colonne Chrono pour le mode patrouille (après Écart)
+        Rectangle {
+            color: bgcolor
+            height: parent.height
+            width: fontSize*7.5
+            visible: displayTimeData && isPatrolMode
+            border.width: 1
+            border.color: "white"
+            Text {
                 anchors.fill: parent
                 verticalAlignment: Text.AlignVCenter
                 horizontalAlignment: Text.AlignHCenter

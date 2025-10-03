@@ -17,6 +17,7 @@ class ViewController : public QObject
     Q_PROPERTY(int appWindowHeight READ appWindowHeight CONSTANT)
     Q_PROPERTY(int bibCount READ bibCount NOTIFY bibCountChanged)
     Q_PROPERTY(int gateCount READ gateCount NOTIFY gateCountChanged)
+    Q_PROPERTY(int competitionMode READ competitionMode NOTIFY competitionModeChanged)
 
 
 public:
@@ -31,6 +32,7 @@ public:
     int appWindowWidth() const { return _appWindowWidth; }
     int appWindowHeight() const { return _appWindowHeight; }
     int gateCount() const { return _gateCount; }
+    int competitionMode() const { return _competitionMode; }
 
 signals:
 
@@ -49,6 +51,7 @@ signals:
     void selectedAddress(QString host);
     void bibCountChanged(int bibCount);
     void gateCountChanged(int gateCount);
+    void competitionModeChanged(int mode);
     void watchdog();
     void openSoftwareUpdate();
     void checknewVersion(bool force);
@@ -69,12 +72,14 @@ public slots:
     void setShowChrono(bool showChrono);
     void setBibCount(int bibCount);
     void setGateCount(int gateCount);
+    void setCompetitionMode(int mode);
     void about();
     void loadPCE();
     void loadTXT();
     void clearPenalties();
     void clearChronos();
     void configureGateCount();
+    void configureCompetitionMode();
     void exportAllData();
     void printError(const QString& title, const QString& message);
     void broadcastError();
@@ -92,6 +97,7 @@ private:
     int _runningTcpPort;
     int _requestedTcpPort;
     int _bibCount;
+    int _competitionMode; // 0 = Individuel, 1 = Patrouille
     DialogBox* _dialogBox;
     FileChooser* _fileChooser;
     bool _dialogBoxOpened;

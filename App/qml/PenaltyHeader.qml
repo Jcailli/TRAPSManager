@@ -5,6 +5,7 @@ Item {
     id: penaltyHeader
 
     property int fontSize: 18
+    property bool isPatrolMode: viewcontroller.competitionMode === 1
 
     height: fontSize*1.5
 
@@ -16,7 +17,7 @@ Item {
         height: penaltyHeader.height
         spacing: 1
         Repeater {
-            model: viewcontroller.gateCount
+            model: isPatrolMode ? viewcontroller.gateCount * 3 : viewcontroller.gateCount
             Rectangle {
                 width: fontSize*3-1
                 height: penaltyHeader.height
@@ -29,8 +30,15 @@ Item {
                     horizontalAlignment: Text.AlignHCenter
                     color: "white"
                     font.pixelSize: fontSize
-                    text: ""+(index+1)
-
+                    text: {
+                        if (isPatrolMode) {
+                            var gateNumber = Math.floor(index / 3) + 1
+                            var letter = ["A", "B", "C"][index % 3]
+                            return gateNumber + letter
+                        } else {
+                            return "" + (index + 1)
+                        }
+                    }
                 }
             }
         }

@@ -12,7 +12,8 @@ ViewController::ViewController(const QStringList& hostList, int requestedTcpPort
     _hostList(hostList),
     _requestedTcpPort(requestedTcpPort),
     _runningTcpPort(0),
-    _gateCount(25)
+    _gateCount(25),
+    _competitionMode(0)
 
 {
     QQmlEngine::setObjectOwnership(this, QQmlEngine::CppOwnership);
@@ -27,6 +28,8 @@ ViewController::ViewController(const QStringList& hostList, int requestedTcpPort
     qDebug() << "appWindowHeight:" << _appWindowHeight;
     _gateCount = settings.value("gateCount", QVariant(25)).toInt();
     qDebug() << "gateCount:" << _gateCount;
+    _competitionMode = settings.value("competitionMode", QVariant(0)).toInt(); // 0 = Individuel, 1 = Patrouille
+    qDebug() << "competitionMode:" << _competitionMode;
 
 }
 
@@ -325,6 +328,34 @@ void ViewController::exportAllData() {
     });
     
     openFileChooser(fileChooser);
+}
+
+void ViewController::setCompetitionMode(int mode) {
+    if (mode < 0) mode = 0;
+    if (mode > 1) mode = 1;
+    
+    if (_competitionMode != mode) {
+        _competitionMode = mode;
+        QSettings settings;
+        settings.setValue("competitionMode", _competitionMode);
+        emit competitionModeChanged(_competitionMode);
+        qDebug() << "Competition mode changed to:" << _competitionMode;
+    }
+}
+
+void ViewController::configureCompetitionMode() {
+    DialogBox* dialogBox = new DialogBox("Configurer le mode de compétition",
+                                          "Sélectionnez le mode de compétition :",
+                                          DIALOGBOX_QUESTION,
+                                          QStringList() << "Individuel" << "Patrouille");
+    dialogBox->onButtonClicked([this, dialogBox](int index) {
+        setCompetitionMode(index);
+        QString modeText = (index == 0) ? "Individuel" : "Patrouille";
+        toast(QString("Mode de compétition configuré : %0").arg(modeText), 3000);
+        dialogBox->deleteLater();
+    });
+    
+    openDialogBox(dialogBox);
 }
 
 void ViewController::tcpServerStarFailure() {

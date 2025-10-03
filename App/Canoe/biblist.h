@@ -48,6 +48,7 @@ public:
     int bibIndex(int bibnumber) const;
     int scheduling() const { return _scheduling; }
     int gateCount() const { return _gateCount; }
+    
 
 signals:
     void error(QString title, QString message);
@@ -100,6 +101,7 @@ private:
     void reloadFromDataBase();
     void setGateCount(int gateCount);
     void orderBibList();
+    
 
 
 

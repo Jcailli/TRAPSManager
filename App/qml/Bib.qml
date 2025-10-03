@@ -13,9 +13,13 @@ Rectangle {
     property alias startTime: startTimeText.text
     property alias finishTime: finishTimeText.text
     property alias runningTime: runningTimeText.text
+    property alias finishTimeFirst: finishTimeFirstText.text
+    property alias finishTimeThird: finishTimeThirdText.text
+    property alias timeGap: timeGapText.text
     property bool displayTimeData: true
     property bool selected: false
     property bool locked: false
+    property bool isPatrolMode: viewcontroller.competitionMode === 1
 
     property int fontSize: 18
 
@@ -91,11 +95,62 @@ Rectangle {
                 font.family: "monospace"
             }
         }
+        // Colonnes spécifiques au mode patrouille - Arrivée1er
         Rectangle {
             color: selected?Material.primary:locked?"lightgray":"white"
             height: parent.height
             width: fontSize*7.5
-            visible: displayTimeData
+            visible: displayTimeData && isPatrolMode
+            Text {
+                id: finishTimeFirstText
+                anchors.fill: parent
+                anchors.rightMargin: 5
+                verticalAlignment: Text.AlignVCenter
+                horizontalAlignment: Text.AlignRight
+                color: selected?"white":locked?"gray":"black"
+                font.pixelSize: fontSize
+                font.family: "monospace"
+            }
+        }
+        // Colonnes spécifiques au mode patrouille - Arrivée3ème
+        Rectangle {
+            color: selected?Material.primary:locked?"lightgray":"white"
+            height: parent.height
+            width: fontSize*7.5
+            visible: displayTimeData && isPatrolMode
+            Text {
+                id: finishTimeThirdText
+                anchors.fill: parent
+                anchors.rightMargin: 5
+                verticalAlignment: Text.AlignVCenter
+                horizontalAlignment: Text.AlignRight
+                color: selected?"white":locked?"gray":"black"
+                font.pixelSize: fontSize
+                font.family: "monospace"
+            }
+        }
+        // Colonnes spécifiques au mode patrouille - Écart
+        Rectangle {
+            color: selected?Material.primary:locked?"lightgray":"white"
+            height: parent.height
+            width: fontSize*4
+            visible: displayTimeData && isPatrolMode
+            Text {
+                id: timeGapText
+                anchors.fill: parent
+                anchors.rightMargin: 5
+                verticalAlignment: Text.AlignVCenter
+                horizontalAlignment: Text.AlignRight
+                color: selected?"white":locked?"gray":"black"
+                font.pixelSize: fontSize
+                font.family: "monospace"
+            }
+        }
+        Rectangle {
+            color: selected?Material.primary:locked?"lightgray":"white"
+            height: parent.height
+            width: fontSize*7.5
+            visible: displayTimeData && !isPatrolMode
             Text {
                 id: finishTimeText
                 anchors.fill: parent
@@ -111,9 +166,25 @@ Rectangle {
             color: selected?Material.primary:locked?"lightgray":"white"
             height: parent.height
             width: fontSize*7.5
-            visible: displayTimeData
+            visible: displayTimeData && !isPatrolMode
             Text {
                 id: runningTimeText
+                anchors.fill: parent
+                anchors.rightMargin: 5
+                verticalAlignment: Text.AlignVCenter
+                horizontalAlignment: Text.AlignRight
+                color: selected?"white":locked?"gray":"black"
+                font.pixelSize: fontSize
+                font.family: "monospace"
+            }
+        }
+        // Colonne Chrono pour le mode patrouille (après Écart)
+        Rectangle {
+            color: selected?Material.primary:locked?"lightgray":"white"
+            height: parent.height
+            width: fontSize*7.5
+            visible: displayTimeData && isPatrolMode
+            Text {
                 anchors.fill: parent
                 anchors.rightMargin: 5
                 verticalAlignment: Text.AlignVCenter
