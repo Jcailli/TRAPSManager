@@ -23,6 +23,7 @@ class BibList : public QAbstractListModel
     Q_OBJECT
 
     Q_PROPERTY(int scheduling READ scheduling CONSTANT)
+    Q_PROPERTY(int gateCount READ gateCount WRITE setGateCount NOTIFY gateCountChanged)
 
 public:
 
@@ -46,11 +47,13 @@ public:
     int bibIndex(const QString& bibId) const;
     int bibIndex(int bibnumber) const;
     int scheduling() const { return _scheduling; }
+    int gateCount() const { return _gateCount; }
 
 signals:
     void error(QString title, QString message);
     void toast(QString text, int delay);
     void bibCountChanged(int);
+    void gateCountChanged(int gateCount);
     // used to send data to third parties
     void penaltyReceived(int bib, int gateId, int value); // bib, gate, value
     void chronoReceived(int bib, int value); // bib, value
@@ -84,6 +87,7 @@ private:
 
     Database _db;
     int _scheduling;
+    int _gateCount;
 
     void rebuildPenaltyList();
 
@@ -92,6 +96,7 @@ private:
     static bool scheduleLessThan(Bib* bib1, Bib* bib2);
 
     void reloadFromDataBase();
+    void setGateCount(int gateCount);
     void orderBibList();
 
 

@@ -10,7 +10,8 @@ ViewController::ViewController(const QStringList& hostList, int requestedTcpPort
     _fileChooserOpened(false),
     _hostList(hostList),
     _requestedTcpPort(requestedTcpPort),
-    _runningTcpPort(0)
+    _runningTcpPort(0),
+    _gateCount(25)
 
 {
     QQmlEngine::setObjectOwnership(this, QQmlEngine::CppOwnership);
@@ -23,12 +24,28 @@ ViewController::ViewController(const QStringList& hostList, int requestedTcpPort
     qDebug() << "appWindowWidth:" << _appWindowWidth;
     _appWindowHeight = settings.value("appWindowHeight", QVariant(600)).toInt();
     qDebug() << "appWindowHeight:" << _appWindowHeight;
+    _gateCount = settings.value("gateCount", QVariant(25)).toInt();
+    qDebug() << "gateCount:" << _gateCount;
 
 }
 
 void ViewController::setBibCount(int bibCount) {
     _bibCount = bibCount;
     emit bibCountChanged(_bibCount);
+}
+
+void ViewController::setGateCount(int gateCount) {
+    // Validation selon le règlement : entre 18 et 25 portes
+    if (gateCount < 18) gateCount = 18;
+    if (gateCount > 25) gateCount = 25;
+    
+    if (_gateCount != gateCount) {
+        _gateCount = gateCount;
+        QSettings settings;
+        settings.setValue("gateCount", _gateCount);
+        emit gateCountChanged(_gateCount);
+        qDebug() << "Gate count changed to:" << _gateCount;
+    }
 }
 
 void ViewController::incFontSize(int step) {
@@ -177,7 +194,7 @@ void ViewController::loadTXT() {
 
 void ViewController::clearPenalties() {
     DialogBox* dialogBox = new DialogBox("Effacer toutes les pénalités ?",
-                                         "Notez que les pénalités ne seront effacées que de TRAPSManager, pas des systèmes tiers tels que FFCanoe ou CompetFFCK.",
+                                         "Notez que les pénalités ne seront effacées que de TRAPSManager, pas des systèmes tiers tels que CompetFFCK.",
                                          DIALOGBOX_QUESTION,
                                          DIALOGBOX_YES | DIALOGBOX_NO);
     dialogBox->onAccepted([this, dialogBox](){
@@ -194,7 +211,7 @@ void ViewController::clearPenalties() {
 
 void ViewController::clearChronos() {
     DialogBox* dialogBox = new DialogBox("Effacer toutes les données chronos ?",
-                                         "Notez que les chronos ne seront effacés que de TRAPSManager, pas des systèmes tiers tels que FFCanoe ou CompetFFCK.",
+                                         "Notez que les chronos ne seront effacés que de TRAPSManager, pas des systèmes tiers tels que CompetFFCK.",
                                          DIALOGBOX_QUESTION,
                                          DIALOGBOX_YES | DIALOGBOX_NO);
     dialogBox->onAccepted([this, dialogBox](){
@@ -274,6 +291,22 @@ void ViewController::viewReady() {
         openDialogBox(dialogBox);
     }
     emit checknewVersion(false);
+}
+
+void ViewController::configureGateCount() {
+    DialogBox* dialogBox = new DialogBox("Configurer le nombre de portes",
+                                         "Sélectionnez le nombre de portes selon le règlement (18-25) :",
+                                         DIALOGBOX_QUESTION, 
+                                         QStringList() << "18" << "19" << "20" << "21" << "22" << "23" << "24" << "25");
+    
+    dialogBox->onButtonClicked([this, dialogBox](int index) {
+        int selectedGateCount = 18 + index; // 18 + index donne 18, 19, 20, etc.
+        setGateCount(selectedGateCount);
+        toast(QString("Nombre de portes configuré à %0").arg(selectedGateCount), 3000);
+        dialogBox->deleteLater();
+    });
+    
+    openDialogBox(dialogBox);
 }
 
 void ViewController::tcpServerStarFailure() {

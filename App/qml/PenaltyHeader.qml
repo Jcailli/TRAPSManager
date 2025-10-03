@@ -16,7 +16,7 @@ Item {
         height: penaltyHeader.height
         spacing: 1
         Repeater {
-            model: 25
+            model: viewcontroller.gateCount
             Rectangle {
                 width: fontSize*3-1
                 height: penaltyHeader.height

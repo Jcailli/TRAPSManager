@@ -14,7 +14,6 @@
 #include "Canoe/penalty.h"
 #include "Canoe/biblist.h"
 #include <QQmlContext>
-#include "FFCanoe/ffcanoe.h"
 #include "Database/database.h"
 #include "HTTPServer/controller/penaltyrequestprocessor.h"
 #include "QtWebApp/httpserver/httplistener.h"
@@ -95,13 +94,10 @@ int main(int argc, char *argv[]) {
     // HelloBroacaster
     HelloBroadcaster hello;
 
-    FFCanoe ffcanoe;
     CompetFFCK competFFCK;
 
     BibList bibList;
 
-    QObject::connect(&bibList, &BibList::penaltyReceived, &ffcanoe, &FFCanoe::sendPenalty);
-    QObject::connect(&bibList, &BibList::chronoReceived, &ffcanoe, &FFCanoe::sendTime);
     QObject::connect(&bibList, &BibList::penaltyReceived, &competFFCK, &CompetFFCK::sendPenalty);
     QObject::connect(&bibList, &BibList::chronoReceived, &competFFCK, &CompetFFCK::sendTime);
 
@@ -146,9 +142,6 @@ int main(int argc, char *argv[]) {
     QObject::connect(&bibList, &BibList::error, &viewController, &ViewController::printError);
     QObject::connect(&bibList, &BibList::toast, &viewController, &ViewController::toast);
 
-    // FFcanoe - ViewController
-    QObject::connect(&ffcanoe, &FFCanoe::toast, &viewController, &ViewController::toast);
-    QObject::connect(&ffcanoe, &FFCanoe::error, &viewController, &ViewController::printError);
 
     // CompetFFCK - ViewController
     QObject::connect(&competFFCK, &CompetFFCK::toast, &viewController, &ViewController::toast);
@@ -163,7 +156,6 @@ int main(int argc, char *argv[]) {
     QQmlApplicationEngine engine;
     engine.rootContext()->setContextProperty("bibList", &bibList);
     engine.rootContext()->setContextProperty("penaltyListModel", bibList.penaltyListModel());
-    engine.rootContext()->setContextProperty("ffcanoe", &ffcanoe);
     engine.rootContext()->setContextProperty("competFFCK", &competFFCK);
     engine.rootContext()->setContextProperty("softwareupdate", &softwareUpdate);
     engine.rootContext()->setContextProperty("viewcontroller", &viewController);
@@ -175,7 +167,6 @@ int main(int argc, char *argv[]) {
     app.exec();
 
     hello.exit();
-    ffcanoe.exit();
     competFFCK.exit();
     tcpServerThread.exit();
 

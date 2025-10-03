@@ -138,7 +138,7 @@ FocusScope {
                 hoverEnabled: true
                 ToolTip.delay: 1000
                 ToolTip.visible: hovered
-                ToolTip.text: "Chaque chrono reçu par TRAPSManager sera renvoyé à FFCanoe"
+                ToolTip.text: "Chaque chrono reçu par TRAPSManager sera renvoyé à CompetFFCK"
                 onCheckedChanged: competFFCK.allowForwardTime(forwardTimeBox.checked)
             }
         }

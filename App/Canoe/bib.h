@@ -5,7 +5,7 @@
 #include <QList>
 #include <QHash>
 
-#define GATE_MAX_COUNT 25
+// GATE_MAX_COUNT est maintenant configurable via BibList
 
 class Bib {
 
@@ -55,6 +55,9 @@ public:
     QJsonObject jsonLock() const;
     QJsonObject jsonTime(qint64 timestamp = 0) const;
     QJsonObject jsonPenalty(qint64 timestamp = 0) const;
+    
+    static int getGateCount();
+    static void setGateCount(int gateCount);
 
     QHash<int, Penalty> penaltyList() const;
     QStringList penaltyStringList() const;
@@ -76,6 +79,8 @@ private:
     qint64 _finishTime;
     QHash<int, Penalty> _penaltyList;
     QHash<int, qint64> _lapTimeList;
+    
+    static int _staticGateCount;
     QString _schedule;
     QString _categ;
     bool _locked;

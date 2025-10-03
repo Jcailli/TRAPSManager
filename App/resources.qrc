@@ -18,7 +18,6 @@
         <file>qml/BibScheduling.qml</file>
         <file>qml/TabHeader.qml</file>
         <file>qtquickcontrols2.conf</file>
-        <file>qml/FFCanoePanel.qml</file>
         <file>qml/TRAPSDrawer.qml</file>
         <file>qml/images/32x32_link.png</file>
         <file>qml/CompetFFCKPanel.qml</file>

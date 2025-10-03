@@ -18,6 +18,7 @@ Drawer {
             ListElement { functionName: "Charger liste de dossards avec fichier CSV\n(manuel ou export Excel)"; functionId: 1 }
             ListElement { functionName: "Effacer pénalités"; functionId: 8 }
             ListElement { functionName: "Effacer chronos"; functionId: 9 }
+            ListElement { functionName: "Configurer nombre de portes"; functionId: 10 }
             ListElement { functionName: "Police plus grande (CTRL +)"; functionId: 3 }
             ListElement { functionName: "Police plus petite (CTRL -)"; functionId: 4 }
             ListElement { functionName: "A propos"; functionId: 5 }
@@ -69,6 +70,11 @@ Drawer {
                     case 1: {
                         drawer.close();
                         viewcontroller.loadTXT();
+                        break;
+                    }
+                    case 10: {
+                        drawer.close();
+                        viewcontroller.configureGateCount();
                         break;
                     }
 

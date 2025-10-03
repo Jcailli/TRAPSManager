@@ -3,6 +3,9 @@
 #include <QDebug>
 #include <QQmlEngine>
 #include <QSettings>
+#include <QFile>
+#include <QTextStream>
+#include <algorithm>
 #include "Database/database.h"
 
 #define DB_BIB "bibs"
@@ -13,18 +16,36 @@
 
 BibList::BibList() : QAbstractListModel(),
     _db("traps.db", QStringList() << DB_BIB << DB_LOCKS << DB_TIMES << DB_PENALTIES),
-    _scheduling(0)
+    _scheduling(0),
+    _gateCount(25)
 
 {
     QQmlEngine::setObjectOwnership(this, QQmlEngine::CppOwnership);
     QSettings settings;
     _scheduling = settings.value("scheduling").toInt();
+    _gateCount = settings.value("gateCount", QVariant(25)).toInt();
+    Bib::setGateCount(_gateCount); // Initialiser Bib avec le nombre de portes
 
     reloadFromDataBase();
 }
 
 int BibList::bibCount() const {
     return _bibList.count();
+}
+
+void BibList::setGateCount(int gateCount) {
+    // Validation selon le règlement : entre 18 et 25 portes
+    if (gateCount < 18) gateCount = 18;
+    if (gateCount > 25) gateCount = 25;
+    
+    if (_gateCount != gateCount) {
+        _gateCount = gateCount;
+        Bib::setGateCount(_gateCount); // Synchroniser avec Bib
+        QSettings settings;
+        settings.setValue("gateCount", _gateCount);
+        emit gateCountChanged(_gateCount);
+        qDebug() << "BibList gate count changed to:" << _gateCount;
+    }
 }
 
 Bib *BibList::bibAtIndex(int index) const {
@@ -284,7 +305,7 @@ void BibList::processIncomingPenalty(int bibnumber, QHash<int, int> penaltyList)
         if (bib->setPenalty(penalty)) {
             qDebug() << "Biblist emiting send penalty for gate " << gateId;
             emit penaltyReceived(bibnumber, gateId, penaltyValue);
-            int changedIndex = bibRow*GATE_MAX_COUNT+gateId-1;
+            int changedIndex = bibRow*_gateCount+gateId-1;
             qDebug() << "Changing penalty at index " << changedIndex;
             _penaltyListModel.setPenalty(changedIndex, QString::number(penaltyValue));
         }
@@ -295,8 +316,8 @@ void BibList::processIncomingPenalty(int bibnumber, QHash<int, int> penaltyList)
     }
     _db.setValue(DB_PENALTIES, bib->id(), bib->jsonPenalty());
     // Notify penalties for this bib has changed
-    int firstIndex = bibRow*GATE_MAX_COUNT;
-    int lastIndex = (bibRow+1)*GATE_MAX_COUNT-1;
+    int firstIndex = bibRow*_gateCount;
+    int lastIndex = (bibRow+1)*_gateCount-1;
     qDebug() << "Data changed from " << firstIndex << " to " << lastIndex;
     emit _penaltyListModel.refresh(firstIndex, lastIndex);
 }
@@ -485,17 +506,17 @@ void BibList::orderBibList() {
     beginResetModel();
     switch (_scheduling) {
         case 0 : {
-            qSort(_bibList.begin(), _bibList.end(), BibList::numberLessThan); // bib number
+            std::sort(_bibList.begin(), _bibList.end(), BibList::numberLessThan); // bib number
             emit toast("Liste ordonnée selon les numéros de dossard croissants", 3000);
             break;
         }
         case 1 : {
-            qSort(_bibList.begin(), _bibList.end(), BibList::scheduleLessThan); // schedule
+            std::sort(_bibList.begin(), _bibList.end(), BibList::scheduleLessThan); // schedule
             emit toast("Liste ordonnée selon les heures de départ", 3000);
             break;
         }
         case 2 : {
-            qSort(_bibList.begin(), _bibList.end(), BibList::entryLessThan); // rank in original file
+            std::sort(_bibList.begin(), _bibList.end(), BibList::entryLessThan); // rank in original file
             emit toast("Liste ordonnée selon le rang dans le fichier d'origine", 3000);
             break;
         }

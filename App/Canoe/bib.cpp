@@ -4,6 +4,9 @@
 #include <QDateTime>
 #include <QDebug>
 
+// Initialisation de la variable statique
+int Bib::_staticGateCount = 25;
+
 
 Bib::Bib(int number) {
     init(number, ' ');
@@ -133,21 +136,21 @@ QHash<int, Penalty> Bib::penaltyList() const {
 
 QStringList Bib::penaltyStringList() const {
     QStringList list;
-    for (int gateId=1; gateId<=GATE_MAX_COUNT; gateId++) {
+    for (int gateId=1; gateId<=_staticGateCount; gateId++) {
         list << _penaltyList.value(gateId).toString();
     }
     return list;
 }
 
 Penalty Bib::penaltyAtGate(int gateId) const {
-    if (gateId<1 || gateId>GATE_MAX_COUNT) return Penalty();
+    if (gateId<1 || gateId>_staticGateCount) return Penalty();
     return _penaltyList.value(gateId);
 }
 
 bool Bib::setPenalty(const Penalty &penalty) {
     if (locked()) return false;
     int gate = penalty.gate();
-    if (gate>0 && gate<=GATE_MAX_COUNT) {
+    if (gate>0 && gate<=_staticGateCount) {
         _penaltyList.remove(gate); // I don't know why but I need to remove first otherwise it's not replaced
         _penaltyList.insert(gate, penalty);
     }
@@ -206,5 +209,16 @@ QJsonObject Bib::jsonPenalty(qint64 timestamp) const {
     }
     obj.insert("penaltyList", array);
     return obj;
+}
+
+int Bib::getGateCount() {
+    return _staticGateCount;
+}
+
+void Bib::setGateCount(int gateCount) {
+    // Validation selon le règlement : entre 18 et 25 portes
+    if (gateCount < 18) gateCount = 18;
+    if (gateCount > 25) gateCount = 25;
+    _staticGateCount = gateCount;
 }
 

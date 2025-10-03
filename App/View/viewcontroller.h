@@ -16,6 +16,7 @@ class ViewController : public QObject
     Q_PROPERTY(int appWindowWidth READ appWindowWidth CONSTANT)
     Q_PROPERTY(int appWindowHeight READ appWindowHeight CONSTANT)
     Q_PROPERTY(int bibCount READ bibCount NOTIFY bibCountChanged)
+    Q_PROPERTY(int gateCount READ gateCount NOTIFY gateCountChanged)
 
 
 public:
@@ -29,6 +30,7 @@ public:
 
     int appWindowWidth() const { return _appWindowWidth; }
     int appWindowHeight() const { return _appWindowHeight; }
+    int gateCount() const { return _gateCount; }
 
 signals:
 
@@ -45,6 +47,7 @@ signals:
     void requestTcpServer(QString host, int port);
     void selectedAddress(QString host);
     void bibCountChanged(int bibCount);
+    void gateCountChanged(int gateCount);
     void watchdog();
     void openSoftwareUpdate();
     void checknewVersion(bool force);
@@ -64,11 +67,13 @@ public slots:
     void selectedFilePath(QString filePath);
     void setShowChrono(bool showChrono);
     void setBibCount(int bibCount);
+    void setGateCount(int gateCount);
     void about();
     void loadPCE();
     void loadTXT();
     void clearPenalties();
     void clearChronos();
+    void configureGateCount();
     void printError(const QString& title, const QString& message);
     void broadcastError();
     void setTcpPort(int tcpPort);
@@ -90,6 +95,7 @@ private:
     bool _dialogBoxOpened;
     bool _fileChooserOpened;
     bool _showChrono;
+    int _gateCount;
 
     void refreshStatusText();
 

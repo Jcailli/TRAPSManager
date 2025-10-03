@@ -21,7 +21,6 @@ HEADERS += \
     Canoe/penalty.h \
     Canoe/biblist.h \
     HTTPServer/controller/penaltyrequestprocessor.h \
-    FFCanoe/ffcanoe.h \
     TCPServer/connectionhandler.h \
     TCPServer/connectionhandlerpool.h \
     TCPServer/tcpserver.h \
@@ -31,7 +30,6 @@ HEADERS += \
     Network/hellobroadcaster.h \
     CompetFFCK/competffck.h \
     CompetFFCK/competffckconnector.h \
-    FFCanoe/ffcanoeconnector.h \
     View/dialogbox.h \
     View/filechooser.h \
     Canoe/penaltylistmodel.h \
@@ -54,7 +52,6 @@ SOURCES += \
     Canoe/penalty.cpp \
     Canoe/biblist.cpp \
     HTTPServer/controller/penaltyrequestprocessor.cpp \
-    FFCanoe/ffcanoe.cpp \
     TCPServer/connectionhandler.cpp \
     TCPServer/connectionhandlerpool.cpp \
     TCPServer/tcpserver.cpp \
@@ -63,7 +60,6 @@ SOURCES += \
     Cloud/cloud.cpp \
     CompetFFCK/competffck.cpp \
     CompetFFCK/competffckconnector.cpp \
-    FFCanoe/ffcanoeconnector.cpp \
     View/dialogbox.cpp \
     View/filechooser.cpp \
     Canoe/penaltylistmodel.cpp \

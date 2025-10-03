@@ -16,7 +16,6 @@ FocusScope {
     ListModel {
         id: headerModel
         ListElement { name:"CompetFFCK"; image:""; imageSelected:"" }
-        ListElement { name:"FFCanoe"; image:""; imageSelected:"" }
 
         function showChain(index) {
             headerModel.setProperty(index, "image", "qrc:/qml/images/link_black.svg")
@@ -56,20 +55,6 @@ FocusScope {
         }
     }
 
-    FFCanoePanel {
-        id: ffcanoePanel
-        anchors.top: comTitle.bottom
-        anchors.bottom: parent.bottom
-        anchors.left: parent.left
-        anchors.right: parent.right
-        fontSize: comPanel.fontSize*0.9
-        onTabPressed: competFFCKDataPanel.focus = true
-        KeyNavigation.right: competFFCKPanel
-        onConnectedChanged: {
-            if (ffcanoePanel.connected) headerModel.showChain(1)
-            else headerModel.hideChain(1)
-        }
-    }
 
     CompetFFCKPanel {
         id: competFFCKPanel
@@ -79,7 +64,6 @@ FocusScope {
         anchors.right: parent.right
         fontSize: comPanel.fontSize*0.9
         onTabPressed: comPanel.tabPressed()
-        KeyNavigation.left: ffcanoePanel
         onConnectedChanged: {
             if (competFFCKPanel.connected) headerModel.showChain(0)
             else headerModel.hideChain(0)
@@ -92,13 +76,8 @@ FocusScope {
     }
 
     function displayPanel(buttonIndex) {
-        if (buttonIndex===1) {
-            competFFCKPanel.visible = false
-            ffcanoePanel.visible = true
-        }
-        else if (buttonIndex===0) {
+        if (buttonIndex===0) {
             competFFCKPanel.visible = true
-            ffcanoePanel.visible = false
         }
     }
 

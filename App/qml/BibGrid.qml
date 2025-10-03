@@ -16,7 +16,7 @@ FocusScope {
     property bool displayTimeData: true
     property int _penaltyCellWidth: fontSize*3
     property int _penaltyCellHeight: fontSize*1.5
-    property int _penaltyCellCount: 25
+    property int _penaltyCellCount: viewcontroller.gateCount
     property int _bibCellWidth: displayTimeData?fontSize*36+6:fontSize*13.5+3
     property bool _shift: false
     property int _firstRowSelected: 0
@@ -212,7 +212,7 @@ FocusScope {
                 if (mouse.button===Qt.LeftButton) {
                     var row = bibList.indexAt(mouse.x, mouse.y+bibList.contentY)
                     bibList.currentIndex = row
-                    penaltyGrid.currentIndex = _penaltyCellCount*row + penaltyGrid.currentIndex%25
+                    penaltyGrid.currentIndex = _penaltyCellCount*row + penaltyGrid.currentIndex%_penaltyCellCount
                 }
             }
 
@@ -240,7 +240,7 @@ FocusScope {
 
                 }
                 MenuItem {
-                    text: "Faire suivre à CompetFFCK / FFCanoe"
+                    text: "Faire suivre à CompetFFCK"
                     font.pixelSize: fontSize
                     onClicked: bibListModel.forwardBib(_firstRowSelected, _lastRowSelected);
                 }
