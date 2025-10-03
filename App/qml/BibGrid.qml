@@ -15,10 +15,11 @@ FocusScope {
 
     property bool displayTimeData: true
     property bool isPatrolMode: viewcontroller.competitionMode === 1
+    property bool isKayakCrossMode: viewcontroller.competitionMode === 2
     property int _penaltyCellWidth: fontSize*3
     property int _penaltyCellHeight: fontSize*1.5
-    property int _penaltyCellCount: isPatrolMode ? viewcontroller.gateCount * 3 : viewcontroller.gateCount
-    property int _bibCellWidth: displayTimeData?(isPatrolMode?fontSize*47.5+8:fontSize*36+6):fontSize*13.5+3
+    property int _penaltyCellCount: isPatrolMode ? viewcontroller.gateCount * 3 : (isKayakCrossMode ? viewcontroller.kayakCrossPostCount + 2 : viewcontroller.gateCount)
+    property int _bibCellWidth: displayTimeData?(isPatrolMode?fontSize*47.5+8:(isKayakCrossMode?fontSize*36+6:fontSize*36+6)):fontSize*13.5+3
     property bool _shift: false
     property int _firstRowSelected: 0
     property int _lastRowSelected: 0

@@ -25,6 +25,11 @@ public:
     int value() const { return _value; }
     void setValue(int value);
     QString toString() const;
+    
+    // Méthodes pour le mode kayak cross
+    QString kayakCrossType() const;
+    void setKayakCrossType(const QString& type);
+    bool isKayakCrossMode() const;
 
     Coord spot1() const { return _spot1; }
     Coord spot2() const { return _spot2; }
@@ -52,6 +57,7 @@ private:
     QString _bib;
     int _gate; // starts at 1
     int _value; // (-1, 0, 2, 50)
+    QString _kayakCrossType; // CLR, FLT, RAL
     Coord _spot1;
     Coord _spot2;
 

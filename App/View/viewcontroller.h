@@ -18,6 +18,8 @@ class ViewController : public QObject
     Q_PROPERTY(int bibCount READ bibCount NOTIFY bibCountChanged)
     Q_PROPERTY(int gateCount READ gateCount NOTIFY gateCountChanged)
     Q_PROPERTY(int competitionMode READ competitionMode NOTIFY competitionModeChanged)
+    Q_PROPERTY(int kayakCrossPostCount READ kayakCrossPostCount NOTIFY kayakCrossPostCountChanged)
+    Q_PROPERTY(QStringList kayakCrossPostTypes READ kayakCrossPostTypes NOTIFY kayakCrossPostTypesChanged)
 
 
 public:
@@ -33,6 +35,8 @@ public:
     int appWindowHeight() const { return _appWindowHeight; }
     int gateCount() const { return _gateCount; }
     int competitionMode() const { return _competitionMode; }
+    int kayakCrossPostCount() const { return _kayakCrossPostCount; }
+    QStringList kayakCrossPostTypes() const { return _kayakCrossPostTypes; }
 
 signals:
 
@@ -52,6 +56,8 @@ signals:
     void bibCountChanged(int bibCount);
     void gateCountChanged(int gateCount);
     void competitionModeChanged(int mode);
+    void kayakCrossPostCountChanged(int postCount);
+    void kayakCrossPostTypesChanged(QStringList postTypes);
     void watchdog();
     void openSoftwareUpdate();
     void checknewVersion(bool force);
@@ -80,6 +86,16 @@ public slots:
     void clearChronos();
     void configureGateCount();
     void configureCompetitionMode();
+    void setKayakCrossPostCount(int postCount);
+    void setKayakCrossPostTypes(QStringList postTypes);
+    void configureKayakCrossPosts();
+    void configureKayakCrossPostCount();
+    void configureKayakCrossPostTypes();
+    void configureKayakCrossAuto();
+    void configureKayakCrossManual();
+    void configureKayakCrossRemontees(int descendues);
+    void configureKayakCrossFinal(int descendues, int remontees);
+    void openKayakCrossPostConfig();
     void exportAllData();
     void printError(const QString& title, const QString& message);
     void broadcastError();
@@ -97,7 +113,9 @@ private:
     int _runningTcpPort;
     int _requestedTcpPort;
     int _bibCount;
-    int _competitionMode; // 0 = Individuel, 1 = Patrouille
+    int _competitionMode; // 0 = Individuel, 1 = Patrouille, 2 = Kayak Cross
+    int _kayakCrossPostCount; // Nombre de postes (1-9)
+    QStringList _kayakCrossPostTypes; // Types des postes
     DialogBox* _dialogBox;
     FileChooser* _fileChooser;
     bool _dialogBoxOpened;

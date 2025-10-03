@@ -3,6 +3,7 @@
 
 Penalty::Penalty() :
     _value(-1),
+    _kayakCrossType(""),
     _canvas(false),
     _teammate(false),
     _gate(-1)
@@ -18,6 +19,7 @@ Penalty::Penalty() :
 Penalty::Penalty(const QString &bib, int gate) :
     _bib(bib),
     _value(-1),
+    _kayakCrossType(""),
     _canvas(false),
     _teammate(false),
     _gate(gate)
@@ -33,6 +35,7 @@ Penalty::Penalty(const QString &bib, int gate) :
 Penalty::Penalty(const QString &bib, int gate, int value) :
     _bib(bib),
     _value(value),
+    _kayakCrossType(""),
     _canvas(false),
     _teammate(false),
     _gate(gate)
@@ -89,6 +92,12 @@ void Penalty::setValue(int value) {
 }
 
 QString Penalty::toString() const {
+    // Mode kayak cross : retourner le type directement
+    if (isKayakCrossMode()) {
+        return _kayakCrossType;
+    }
+    
+    // Mode slalom/patrouille : retourner la valeur numérique
     switch (_value) {
         case 0: return "0";
         case 2: return "2";
@@ -151,6 +160,19 @@ void Penalty::copy(const Penalty &other) {
     _teammate = other.teammate();
     _spot1 = other.spot1();
     _spot2 = other.spot2();
+    _kayakCrossType = other._kayakCrossType;
 
+}
+
+QString Penalty::kayakCrossType() const {
+    return _kayakCrossType;
+}
+
+void Penalty::setKayakCrossType(const QString& type) {
+    _kayakCrossType = type;
+}
+
+bool Penalty::isKayakCrossMode() const {
+    return !_kayakCrossType.isEmpty();
 }
 

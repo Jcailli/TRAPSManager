@@ -8,12 +8,15 @@ Rectangle {
     property int fontSize: 18
     property color bgcolor: "gray"
     property bool isPatrolMode: viewcontroller.competitionMode === 1
+    property bool isKayakCrossMode: viewcontroller.competitionMode === 2
 
     height: fontSize*1.5
 
     width: {
         if (isPatrolMode && displayTimeData) {
             return fontSize*46.5+8 // Plus large pour les colonnes patrouille (8 colonnes fixes)
+        } else if (isKayakCrossMode && displayTimeData) {
+            return fontSize*36+6 // Largeur pour les colonnes kayak cross (6 colonnes fixes)
         } else if (displayTimeData) {
             return fontSize*21.5+6
         } else {

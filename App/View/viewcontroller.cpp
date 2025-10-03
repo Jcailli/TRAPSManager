@@ -13,7 +13,9 @@ ViewController::ViewController(const QStringList& hostList, int requestedTcpPort
     _requestedTcpPort(requestedTcpPort),
     _runningTcpPort(0),
     _gateCount(25),
-    _competitionMode(0)
+    _competitionMode(0),
+    _kayakCrossPostCount(5),
+    _kayakCrossPostTypes(QStringList())
 
 {
     QQmlEngine::setObjectOwnership(this, QQmlEngine::CppOwnership);
@@ -28,8 +30,12 @@ ViewController::ViewController(const QStringList& hostList, int requestedTcpPort
     qDebug() << "appWindowHeight:" << _appWindowHeight;
     _gateCount = settings.value("gateCount", QVariant(25)).toInt();
     qDebug() << "gateCount:" << _gateCount;
-    _competitionMode = settings.value("competitionMode", QVariant(0)).toInt(); // 0 = Individuel, 1 = Patrouille
+    _competitionMode = settings.value("competitionMode", QVariant(0)).toInt(); // 0 = Individuel, 1 = Patrouille, 2 = Kayak Cross
     qDebug() << "competitionMode:" << _competitionMode;
+    _kayakCrossPostCount = settings.value("kayakCrossPostCount", QVariant(5)).toInt();
+    qDebug() << "kayakCrossPostCount:" << _kayakCrossPostCount;
+    _kayakCrossPostTypes = settings.value("kayakCrossPostTypes", QVariant(QStringList())).toStringList();
+    qDebug() << "kayakCrossPostTypes:" << _kayakCrossPostTypes;
 
 }
 
@@ -332,7 +338,7 @@ void ViewController::exportAllData() {
 
 void ViewController::setCompetitionMode(int mode) {
     if (mode < 0) mode = 0;
-    if (mode > 1) mode = 1;
+    if (mode > 2) mode = 2; // 0 = Individuel, 1 = Patrouille, 2 = Kayak Cross
     
     if (_competitionMode != mode) {
         _competitionMode = mode;
@@ -347,15 +353,223 @@ void ViewController::configureCompetitionMode() {
     DialogBox* dialogBox = new DialogBox("Configurer le mode de compétition",
                                           "Sélectionnez le mode de compétition :",
                                           DIALOGBOX_QUESTION,
-                                          QStringList() << "Individuel" << "Patrouille");
+                                          QStringList() << "Individuel" << "Patrouille" << "Kayak Cross (Time Trial)");
     dialogBox->onButtonClicked([this, dialogBox](int index) {
         setCompetitionMode(index);
-        QString modeText = (index == 0) ? "Individuel" : "Patrouille";
+        QString modeText;
+        switch(index) {
+            case 0: modeText = "Individuel"; break;
+            case 1: modeText = "Patrouille"; break;
+            case 2: modeText = "Kayak Cross (Time Trial)"; break;
+        }
         toast(QString("Mode de compétition configuré : %0").arg(modeText), 3000);
         dialogBox->deleteLater();
     });
     
     openDialogBox(dialogBox);
+}
+
+void ViewController::setKayakCrossPostCount(int postCount) {
+    // Validation : entre 1 et 9 postes
+    if (postCount < 1) postCount = 1;
+    if (postCount > 9) postCount = 9;
+    
+    if (_kayakCrossPostCount != postCount) {
+        _kayakCrossPostCount = postCount;
+        QSettings settings;
+        settings.setValue("kayakCrossPostCount", _kayakCrossPostCount);
+        emit kayakCrossPostCountChanged(_kayakCrossPostCount);
+    }
+}
+
+void ViewController::setKayakCrossPostTypes(QStringList postTypes) {
+    // Validation des contraintes pour Kayak Cross Time Trial
+    int esquimautageCount = postTypes.count("Esquimautage");
+    int porteRemonteeCount = postTypes.count("Porte remontée");
+    int porteDescendueCount = postTypes.count("Porte descendue");
+    
+    // Validation : 0 ou 1 esquimautage (pas obligatoire)
+    if (esquimautageCount > 1) {
+        toast("Erreur : Il ne peut y avoir qu'1 seul esquimautage maximum", 5000);
+        return;
+    }
+    
+    // Validation : 4-6 portes descendues
+    if (porteDescendueCount < 4 || porteDescendueCount > 6) {
+        toast("Erreur : Il doit y avoir entre 4 et 6 portes descendues", 5000);
+        return;
+    }
+    
+    // Validation : 0-2 portes remontées
+    if (porteRemonteeCount > 2) {
+        toast("Erreur : Il ne peut y avoir que 0 à 2 portes remontées", 5000);
+        return;
+    }
+    
+    // Validation : total entre 4 et 9 postes
+    int totalPosts = postTypes.count();
+    if (totalPosts < 4 || totalPosts > 9) {
+        toast("Erreur : Le total doit être entre 4 et 9 postes", 5000);
+        return;
+    }
+    
+    // L'esquimautage peut être placé n'importe où dans le parcours
+    
+    if (_kayakCrossPostTypes != postTypes) {
+        _kayakCrossPostTypes = postTypes;
+        QSettings settings;
+        settings.setValue("kayakCrossPostTypes", _kayakCrossPostTypes);
+        emit kayakCrossPostTypesChanged(_kayakCrossPostTypes);
+        
+        // Mettre à jour le nombre de postes automatiquement
+        setKayakCrossPostCount(totalPosts);
+        
+        // Message de confirmation
+        QString configText = QString("Configuration Kayak Cross appliquée : %0 postes")
+                            .arg(totalPosts);
+        toast(configText, 2000);
+    }
+}
+
+void ViewController::configureKayakCrossPosts() {
+    DialogBox* dialogBox = new DialogBox("Configurer les postes Kayak Cross",
+                                          "Sélectionnez le type de configuration :",
+                                          DIALOGBOX_QUESTION,
+                                          QStringList() << "Configuration simple (nombre de postes)" 
+                                                       << "Configuration avancée (types de postes)");
+    dialogBox->onButtonClicked([this, dialogBox](int index) {
+        if (index == 0) {
+            // Configuration simple - nombre de postes
+            configureKayakCrossPostCount();
+        } else {
+            // Configuration avancée - types de postes
+            configureKayakCrossPostTypes();
+        }
+        dialogBox->deleteLater();
+    });
+    
+    openDialogBox(dialogBox);
+}
+
+void ViewController::configureKayakCrossPostCount() {
+    DialogBox* dialogBox = new DialogBox("Configurer le nombre de postes",
+                                          "Sélectionnez le nombre de postes (4-9) :",
+                                          DIALOGBOX_QUESTION,
+                                          QStringList() << "4" << "5" << "6" << "7" << "8" << "9");
+    dialogBox->onButtonClicked([this, dialogBox](int index) {
+        int postCount = index + 4; // 4-9 postes
+        setKayakCrossPostCount(postCount);
+        toast(QString("Nombre de postes configuré : %0").arg(postCount), 3000);
+        dialogBox->deleteLater();
+    });
+    
+    openDialogBox(dialogBox);
+}
+
+void ViewController::configureKayakCrossPostTypes() {
+    DialogBox* dialogBox = new DialogBox("Configurer les types de postes",
+                                          "Configuration des postes Kayak Cross Time Trial :\n\n"
+                                          "• 4-6 Portes descendues (obligatoires)\n"
+                                          "• 0-2 Portes remontées (optionnelles)\n"
+                                          "• 1 Esquimautage (obligatoire)\n\n"
+                                          "Total : 5-9 postes",
+                                          DIALOGBOX_QUESTION,
+                                          QStringList() << "Configuration automatique (5 postes minimum)"
+                                                       << "Configuration manuelle (types détaillés)");
+    dialogBox->onButtonClicked([this, dialogBox](int index) {
+        if (index == 0) {
+            // Configuration automatique - 5 postes minimum
+            configureKayakCrossAuto();
+        } else {
+            // Configuration manuelle - types détaillés
+            configureKayakCrossManual();
+        }
+        dialogBox->deleteLater();
+    });
+    
+    openDialogBox(dialogBox);
+}
+
+void ViewController::configureKayakCrossAuto() {
+    // Configuration automatique : 4 descendues (minimum)
+    QStringList autoConfig;
+    for (int i = 0; i < 4; i++) {
+        autoConfig << "Porte descendue";
+    }
+    
+    setKayakCrossPostTypes(autoConfig);
+    setKayakCrossPostCount(4);
+    toast("Configuration automatique : 4 portes descendues (minimum)", 3000);
+}
+
+void ViewController::configureKayakCrossManual() {
+    // Configuration manuelle - interface pour sélectionner les types
+    DialogBox* dialogBox = new DialogBox("Configuration manuelle des postes",
+                                          "Sélectionnez le nombre de portes descendues (4-6) :",
+                                          DIALOGBOX_QUESTION,
+                                          QStringList() << "4 portes descendues" 
+                                                       << "5 portes descendues" 
+                                                       << "6 portes descendues");
+    dialogBox->onButtonClicked([this, dialogBox](int index) {
+        int descendues = index + 4; // 4-6
+        configureKayakCrossRemontees(descendues);
+        dialogBox->deleteLater();
+    });
+    
+    openDialogBox(dialogBox);
+}
+
+void ViewController::configureKayakCrossRemontees(int descendues) {
+    DialogBox* dialogBox = new DialogBox("Configuration des portes remontées",
+                                          QString("Vous avez %0 portes descendues.\n\n"
+                                                 "Sélectionnez le nombre de portes remontées (0-2) :").arg(descendues),
+                                          DIALOGBOX_QUESTION,
+                                          QStringList() << "0 porte remontée" 
+                                                       << "1 porte remontée" 
+                                                       << "2 portes remontées");
+    dialogBox->onButtonClicked([this, dialogBox, descendues](int index) {
+        int remontees = index; // 0-2
+        configureKayakCrossFinal(descendues, remontees);
+        dialogBox->deleteLater();
+    });
+    
+    openDialogBox(dialogBox);
+}
+
+void ViewController::configureKayakCrossFinal(int descendues, int remontees) {
+    // Construction de la configuration finale
+    QStringList finalConfig;
+    
+    // Ajouter les portes descendues
+    for (int i = 0; i < descendues; i++) {
+        finalConfig << "Porte descendue";
+    }
+    
+    // Ajouter les portes remontées
+    for (int i = 0; i < remontees; i++) {
+        finalConfig << "Porte remontée";
+    }
+    
+    // Valider et appliquer la configuration
+    int totalPosts = descendues + remontees; // Pas d'esquimautage obligatoire
+    
+    if (totalPosts < 4 || totalPosts > 9) {
+        toast("Erreur : Configuration invalide (total doit être entre 4 et 9)", 5000);
+        return;
+    }
+    
+    setKayakCrossPostTypes(finalConfig);
+    setKayakCrossPostCount(totalPosts);
+    
+    QString configText = QString("Configuration : %0 descendues, %1 remontées")
+                        .arg(descendues).arg(remontees);
+    toast(configText, 3000);
+}
+
+void ViewController::openKayakCrossPostConfig() {
+    // Cette méthode sera utilisée pour ouvrir le dialog de configuration avancée
+    // depuis l'interface QML
+    configureKayakCrossPostTypes();
 }
 
 void ViewController::tcpServerStarFailure() {

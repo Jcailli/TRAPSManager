@@ -20,6 +20,7 @@ Rectangle {
     property bool selected: false
     property bool locked: false
     property bool isPatrolMode: viewcontroller.competitionMode === 1
+    property bool isKayakCrossMode: viewcontroller.competitionMode === 2
 
     property int fontSize: 18
 

@@ -36,5 +36,6 @@
         <file>qml/images/update80.png</file>
         <file>trapsmanager.json</file>
         <file>qml/Popup.qml</file>
+        <file>qml/KayakCrossPostConfig.qml</file>
     </qresource>
 </RCC>
