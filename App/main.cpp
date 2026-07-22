@@ -102,6 +102,7 @@ int main(int argc, char *argv[]) {
 
     QObject::connect(&bibList, &BibList::penaltyReceived, &competFFCK, &CompetFFCK::sendPenalty);
     QObject::connect(&bibList, &BibList::chronoReceived, &competFFCK, &CompetFFCK::sendTime);
+    QObject::connect(&competFFCK, &CompetFFCK::bibListReceived, &bibList, &BibList::processCompetFFCKList);
 
 
     QStringList hostList = HelloBroadcaster::localAddressList();

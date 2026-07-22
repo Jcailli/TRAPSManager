@@ -144,10 +144,11 @@ FocusScope {
         }
 
         Row {
+            id: connectionRow
             anchors.left: parent.left
             anchors.top: forwardCheckGroup.bottom
             anchors.leftMargin: 7
-            height: connectionSwitch.height
+            height: Math.max(connectionSwitch.height, loadBibListButton.height)
             spacing: 10
 
             Label {
@@ -191,7 +192,18 @@ FocusScope {
                 anchors.verticalCenter: parent.verticalCenter
             }
 
-
+            Button {
+                id: loadBibListButton
+                anchors.verticalCenter: parent.verticalCenter
+                font.pixelSize: competFFCKPanel.fontSize - 2
+                text: "Charger dossards"
+                enabled: competFFCK.connected
+                hoverEnabled: true
+                ToolTip.delay: 1000
+                ToolTip.visible: hovered
+                ToolTip.text: "Récupère dossards, catégories et horaires\ndepuis la fenêtre de gestion CompetFFCK"
+                onClicked: competFFCK.requestBibList()
+            }
         }
 
     }

@@ -1,6 +1,7 @@
 #include "competffck.h"
 #include <QQmlEngine>
 #include <QSettings>
+#include <QMetaType>
 
 #define COMPETFFCK_HOST "competFFCKHost"
 #define COMPETFFCK_PORT "competFFCKPort"
@@ -15,6 +16,7 @@ CompetFFCK::CompetFFCK(QObject *parent) : QObject(parent),
     _port(7072),
     _buffer(0)
 {
+    qRegisterMetaType<QJsonArray>("QJsonArray");
 
     QQmlEngine::setObjectOwnership(this, QQmlEngine::CppOwnership);
     QSettings settings;
@@ -26,10 +28,12 @@ CompetFFCK::CompetFFCK(QObject *parent) : QObject(parent),
     QObject::connect(&_connector, &CompetFFCKConnector::connectedToServer, this, &CompetFFCK::setConnected);
     QObject::connect(&_connector, &CompetFFCKConnector::error, this, &CompetFFCK::error);
     QObject::connect(&_connector, &CompetFFCKConnector::penaltySent, this, &CompetFFCK::penaltySent);
+    QObject::connect(&_connector, &CompetFFCKConnector::bibListReceived, this, &CompetFFCK::onBibListReceived);
     QObject::connect(this, &CompetFFCK::connectToServer, &_connector, &CompetFFCKConnector::connectToServer);
     QObject::connect(this, &CompetFFCK::disconnectFromServer, &_connector, &CompetFFCKConnector::disconnectFromServer);
     QObject::connect(this, &CompetFFCK::sendPenaltyToServer, &_connector, &CompetFFCKConnector::sendPenalty);
     QObject::connect(this, &CompetFFCK::sendTimeToServer, &_connector, &CompetFFCKConnector::sendTime);
+    QObject::connect(this, &CompetFFCK::requestBibListFromServer, &_connector, &CompetFFCKConnector::requestBibList);
 
     _connector.moveToThread(&_connectorThread);
     _connectorThread.start();
@@ -80,6 +84,7 @@ void CompetFFCK::requestConnection(bool value) {
 
 void CompetFFCK::setConnected(bool connected) {
     _connected = connected;
+    emit connectedChanged(_connected);
      if (_connected) {
          emit connectedToTarget();
          emit toast("Connecté à CompetFFCK", 3000);
@@ -92,6 +97,23 @@ void CompetFFCK::penaltySent() {
         _buffer--;
         emit bufferChanged(_buffer);
     }
+}
+
+void CompetFFCK::requestBibList() {
+    if (!_connected) {
+        emit error("Chargement dossards CompetFFCK", "Connectez-vous d'abord à CompetFFCK");
+        return;
+    }
+    emit toast("Chargement des dossards depuis CompetFFCK...", 3000);
+    emit requestBibListFromServer();
+}
+
+void CompetFFCK::onBibListReceived(const QJsonArray &bibs) {
+    if (bibs.isEmpty()) {
+        emit toast("Aucun dossard reçu de CompetFFCK", 4000);
+        return;
+    }
+    emit bibListReceived(bibs);
 }
 
 void CompetFFCK::sendPenalty(int bib, int gateId, int penalty) {

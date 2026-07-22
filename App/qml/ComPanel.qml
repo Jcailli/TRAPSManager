@@ -3,7 +3,7 @@ import QtQuick.Controls 2.3
 
 FocusScope {
     id: comPanel
-    height: 200
+    height: 260
     focus: true
 
     property bool opened: false

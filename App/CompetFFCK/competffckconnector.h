@@ -4,6 +4,7 @@
 #include <QObject>
 #include <QTcpSocket>
 #include <QAbstractSocket>
+#include <QJsonArray>
 
 class CompetFFCKConnector : public QObject
 {
@@ -17,6 +18,7 @@ signals:
     void error(QString title, QString message);
     void penaltySent();
     void chronoSent();
+    void bibListReceived(QJsonArray bibs);
 
 public slots:
 
@@ -25,6 +27,7 @@ public slots:
     void errorHandler(QAbstractSocket::SocketError);
     void sendPenalty(int bib, int gateId, int penalty);
     void sendTime(int bib, int chrono); // in milliseconds
+    void requestBibList();
 
 
 private:

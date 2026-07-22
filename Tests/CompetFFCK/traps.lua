@@ -1,4 +1,4 @@
--- SERVER SOCKETS POUR TRAPS
+﻿-- SERVER SOCKETS POUR TRAPS
 dofile('./interface/uty.lua');
 dofile('./interface/interface.lua');
 dofile('./interface/device.lua');
@@ -168,12 +168,234 @@ function ReadPacket(cb)
 		local bib = tonumber(tab[2])
 		local chrono = tonumber(tab[3])
 		Alert("TRAPS: dossard "..bib.." finish "..chrono)
-		AddTimePassage(bib, chrono, -1)	
+		AddTimePassage(bib, chrono, -1)
+	elseif #tab >= 1 and tab[1]=="list" then
+		SendBibList()
 	else
 		Warning("Commande inconnue: "..line)
 	end	
 	return true;	-- il faut poursuivre la recherche	
 end
+
+-- Envoi liste dossards (fenêtre de gestion) vers TRAPSManager
+-- Format: bib <numero> <categorie> <horaire>\r ... list_end\r
+-- Priorité: <epreuve_load> = catégories sélectionnées dans la vue gestion
+function SendBibList()
+	local function writeLine(txt)
+		if myServer ~= nil then
+			myServer:WriteString(txt..string.char(13));
+		end
+	end
+
+	local function formatSchedule(heureMs)
+		if heureMs == nil or heureMs < 0 then return '-' end
+		local schedule = app.TimeToString(heureMs, "%2h:%2m:%2s");
+		return string.gsub(tostring(schedule), '%s+', '');
+	end
+
+	local function sanitize(txt)
+		if txt == nil or txt == '' then return '-' end
+		return string.gsub(tostring(txt), '%s+', '_');
+	end
+
+	local function readBibNumber(t, row)
+		local n = t:GetCellInt('Dossard', row, 0);
+		if n ~= nil and n > 0 then return n end
+		n = tonumber(t:GetCell('Dossard', row));
+		if n ~= nil and n > 0 then return n end
+		return 0;
+	end
+
+	local function readHeureDepart(t, row, codeCourse, codePhase)
+		local txt = tostring(codeCourse)..'_'..tostring(codePhase);
+		local candidates = {
+			'Heure_depart'..txt,
+			'Heure_depart',
+			'@START_TIME_'..txt..'_1',
+			'Heure_depart'..txt..'_1'
+		};
+		for _, col in ipairs(candidates) do
+			local ok, heure = pcall(function() return t:GetCellInt(col, row, -1) end);
+			if ok and heure ~= nil and heure >= 0 then
+				return heure;
+			end
+		end
+		return -1;
+	end
+
+	local function rankingTableFromNotify(notifyName)
+		local a, b = app.SendNotify(notifyName);
+		if type(a) == 'table' and a.ranking ~= nil then return a.ranking end
+		if type(b) == 'table' and b.ranking ~= nil then return b.ranking end
+		if a == true and type(b) == 'userdata' then return b end
+		if type(a) == 'userdata' then return a end
+		return nil;
+	end
+
+	local function rowsFromRanking(tRanking, codeCourse, codePhase, sourceLabel)
+		if tRanking == nil then return nil end
+		local nb = 0;
+		pcall(function() nb = tRanking:GetNbRows() or 0 end);
+		if nb < 1 then return nil end
+
+		local txt = tostring(codeCourse)..'_'..tostring(codePhase);
+		pcall(function() tRanking:OrderBy('Heure_depart'..txt..', Dossard') end);
+
+		local rows = {};
+		local categSet = {};
+		for i = 0, nb - 1 do
+			local bib = readBibNumber(tRanking, i);
+			if bib > 0 then
+				local categ = sanitize(tRanking:GetCell('Code_categorie', i));
+				categSet[categ] = true;
+				rows[#rows + 1] = {
+					bib = bib,
+					categ = categ,
+					schedule = formatSchedule(readHeureDepart(tRanking, i, codeCourse, codePhase))
+				};
+			end
+		end
+		if #rows < 1 then return nil end
+
+		local categList = {};
+		for c, _ in pairs(categSet) do categList[#categList + 1] = c end;
+		table.sort(categList);
+		Alert("TRAPS: "..sourceLabel.." rows="..tostring(#rows).." categ="..table.concat(categList, ','));
+		return rows;
+	end
+
+	-- Vue filtrée (catégories cochées en gestion)
+	local function loadFromEpreuve(codeCourse, codePhase)
+		local tRanking = rankingTableFromNotify('<epreuve_load>');
+		return rowsFromRanking(tRanking, codeCourse, codePhase, 'epreuve_load');
+	end
+
+	-- Fallback SQL : dossards inscrits sur la course/phase (toute la manche)
+	local function loadBibRowsSql(raceInfo, codeCourse, codePhase)
+		if raceInfo.tables == nil or raceInfo.tables.Competition == nil then
+			return nil, nil, "no_competition_table"
+		end
+		local tCompetition = raceInfo.tables.Competition;
+		local codeCompetition = tCompetition:GetCellInt('Code', 0);
+		if codeCompetition == nil or codeCompetition < 1 then
+			return nil, nil, "bad_code_competition"
+		end
+
+		local ok, db = pcall(function() return sqlBase.Clone() end);
+		if not ok or db == nil then
+			return nil, nil, "sql_clone_failed"
+		end
+
+		local tCourse = db:GetTable('Resultat_Course');
+		if tCourse == nil then
+			db:Delete();
+			return nil, nil, "no_resultat_course"
+		end
+
+		local cmdCourse = "Select * From Resultat_Course "..
+			"Where Code_competition = "..tostring(codeCompetition)..
+			" And Code_course = "..tostring(codeCourse)..
+			" And Code_phase = "..tostring(codePhase)..
+			" Order By Heure_depart, Code_bateau";
+		local okCourse = pcall(function() db:TableLoad(tCourse, cmdCourse) end);
+		if not okCourse or (tCourse:GetNbRows() or 0) < 1 then
+			db:Delete();
+			return nil, nil, "resultat_course_empty"
+		end
+
+		local heureByBateau = {};
+		local categByBateau = {};
+		local bateauList = {};
+		for i = 0, tCourse:GetNbRows() - 1 do
+			local codeBateau = tostring(tCourse:GetCell('Code_bateau', i) or '');
+			if codeBateau ~= '' then
+				heureByBateau[codeBateau] = tCourse:GetCellInt('Heure_depart', i, -1);
+				local rcCateg = tCourse:GetCell('Code_categorie', i);
+				if rcCateg ~= nil and rcCateg ~= '' then
+					categByBateau[codeBateau] = sanitize(rcCateg);
+				end
+				bateauList[#bateauList + 1] = codeBateau;
+			end
+		end
+
+		local tRes = db:GetTable('Resultat');
+		if tRes == nil then
+			db:Delete();
+			return nil, nil, "no_resultat_table"
+		end
+
+		local cmd = "Select * From Resultat Where Code_competition = "..tostring(codeCompetition)..
+			" And Dossard Is Not Null And Dossard > 0 Order By Dossard";
+		local okLoad = pcall(function() db:TableLoad(tRes, cmd) end);
+		if not okLoad then
+			db:Delete();
+			return nil, nil, "resultat_query_failed"
+		end
+
+		local rows = {};
+		for i = 0, tRes:GetNbRows() - 1 do
+			local codeBateau = tostring(tRes:GetCell('Code_bateau', i) or '');
+			if codeBateau ~= '' and heureByBateau[codeBateau] ~= nil then
+				local bib = readBibNumber(tRes, i);
+				if bib > 0 then
+					local categ = categByBateau[codeBateau];
+					if categ == nil then
+						categ = sanitize(tRes:GetCell('Code_categorie', i));
+					end
+					rows[#rows + 1] = {
+						bib = bib,
+						categ = categ,
+						schedule = formatSchedule(heureByBateau[codeBateau])
+					};
+				end
+			end
+		end
+
+		Alert("TRAPS: sql fallback rows="..tostring(#rows).." (manche complete course/phase)");
+		return rows, db, "ok";
+	end
+
+	local rcRace, raceInfo = app.SendNotify('<race_load>');
+	if rcRace == false or type(raceInfo) ~= 'table' then
+		writeLine("list_error race_load");
+		Warning("TRAPS: list impossible (race_load)");
+		return
+	end
+
+	local codeCourse = tonumber(raceInfo.Code_course) or 1;
+	local codePhase = tonumber(raceInfo.Code_phase) or 1;
+
+	local rows = loadFromEpreuve(codeCourse, codePhase);
+	local source = 'epreuve_load';
+
+	if rows == nil or #rows < 1 then
+		local db, status;
+		rows, db, status = loadBibRowsSql(raceInfo, codeCourse, codePhase);
+		if db ~= nil then db:Delete() end
+		source = 'sql';
+		if rows == nil then
+			writeLine("list_error sql_"..tostring(status));
+			Warning("TRAPS: list impossible ("..tostring(status)..")");
+			return
+		end
+	end
+
+	if #rows == 0 then
+		writeLine("list_error empty_selection");
+		Warning("TRAPS: list vide (aucune categorie selectionnee ?)");
+		return
+	end
+
+	for i = 1, #rows do
+		local r = rows[i];
+		writeLine("bib "..tostring(r.bib).." "..r.categ.." "..r.schedule);
+	end
+
+	writeLine("list_end "..tostring(#rows));
+	Alert("TRAPS: list envoyee ("..tostring(#rows).." dossards via "..source..")");
+end
+
+
 
 function AddPenalty(bib, gate, embarcation, penalty)
 	app.SendNotify('<penalty_add>',

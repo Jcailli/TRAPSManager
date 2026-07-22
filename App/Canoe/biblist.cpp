@@ -283,6 +283,57 @@ void BibList::processTXT(const QString& filename, bool reset) {
 
 }
 
+void BibList::processCompetFFCKList(const QJsonArray &bibs) {
+    if (bibs.isEmpty()) {
+        emit toast("Aucun dossard reçu de CompetFFCK", 4000);
+        return;
+    }
+
+    QHash<QString,QJsonObject> bibMap;
+    QHash<QString,QJsonObject> locks;
+    QHash<QString,QJsonObject> times;
+    QHash<QString,QJsonObject> penalties;
+    int row = 0;
+
+    for (int i = 0; i < bibs.size(); ++i) {
+        QJsonObject obj = bibs.at(i).toObject();
+        int bibnumber = obj.value("bib").toInt();
+        if (bibnumber < 1) continue;
+
+        row++;
+        Bib bib(bibnumber);
+        QString categ = obj.value("categ").toString();
+        if (categ.isEmpty()) categ = "-";
+        QString schedule = obj.value("schedule").toString();
+        if (schedule.isEmpty()) schedule = "-";
+
+        bib.setCateg(categ);
+        bib.setSchedule(schedule);
+        bib.setEntry(row);
+        bibMap.insert(bib.id(), bib.jsonParam());
+        locks.insert(bib.id(), bib.jsonLock());
+        times.insert(bib.id(), bib.jsonTime());
+        penalties.insert(bib.id(), bib.jsonPenalty());
+    }
+
+    if (bibMap.isEmpty()) {
+        emit error("Chargement CompetFFCK", "Aucun dossard valide dans la réponse CompetFFCK");
+        return;
+    }
+
+    _db.reset();
+    emit toast("Dossards actuels effacés", 3000);
+
+    _db.setValueMap(DB_BIB, bibMap);
+    _db.setValueMap(DB_LOCKS, locks);
+    _db.setValueMap(DB_TIMES, times);
+    _db.setValueMap(DB_PENALTIES, penalties);
+
+    reloadFromDataBase();
+    orderBibList();
+    emit toast(QString("Liste de %0 dossards chargée depuis CompetFFCK").arg(bibMap.count()), 4500);
+}
+
 void BibList::clearPenalties() {
     foreach (Bib* bib, _bibList) {
         bib->clearPenalties();

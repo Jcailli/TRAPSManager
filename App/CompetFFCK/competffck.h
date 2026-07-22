@@ -4,6 +4,7 @@
 #include <QObject>
 #include <CompetFFCK/competffckconnector.h>
 #include <QThread>
+#include <QJsonArray>
 
 class CompetFFCK : public QObject
 {
@@ -14,6 +15,7 @@ class CompetFFCK : public QObject
     Q_PROPERTY(QString host READ host CONSTANT)
     Q_PROPERTY(int port READ port CONSTANT)
     Q_PROPERTY(int buffer READ buffer NOTIFY bufferChanged)
+    Q_PROPERTY(bool connected READ connected NOTIFY connectedChanged)
 
 public:
     explicit CompetFFCK(QObject *parent = nullptr);
@@ -23,6 +25,7 @@ public:
     QString host() const { return _host; }
     int port() const { return _port; }
     int buffer() const { return _buffer; }
+    bool connected() const { return _connected; }
     void exit();
 
 signals:
@@ -31,10 +34,13 @@ signals:
     void disconnectFromServer();
     void connectedToTarget();
     void disconnectedFromTarget();
+    void connectedChanged(bool connected);
     void connecting();
     void errorChanged(QString error);
     void sendPenaltyToServer(int bib, int gateId, int penalty);
     void sendTimeToServer(int bib, int time);
+    void requestBibListFromServer();
+    void bibListReceived(QJsonArray bibs);
     void error(QString title, QString message);
     void toast(QString message, int delay);
     void bufferChanged(int);
@@ -51,6 +57,8 @@ public slots:
     void requestConnection(bool value);
     void setConnected(bool connected);
     void penaltySent();
+    void requestBibList();
+    void onBibListReceived(const QJsonArray &bibs);
 
     void sendPenalty(int bib, int gateId, int penalty);
     void sendTime(int bib, int time);

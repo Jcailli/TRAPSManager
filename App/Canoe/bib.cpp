@@ -39,18 +39,18 @@ Bib::Bib(const QString& id, const QJsonObject &json) :
     _timestamp(0)
 {
 
-    // id is 999 or 999A
-    if (id.count()==3) {
-        _idNumber = id.toInt();
+    // Formats supportés: "42", "042", "999", "999A", "1001", "1001A"
+    if (!id.isEmpty() && id.at(id.length() - 1).isLetter()) {
+        _idLetter = id.at(id.length() - 1).toLatin1();
+        _idNumber = id.left(id.length() - 1).toInt();
+    } else {
+        bool ok = false;
+        _idNumber = id.toInt(&ok);
         _idLetter = ' ';
-    }
-    else if (id.count()==4) {
-        _idNumber = id.left(3).toInt();
-        _idLetter = id.at(3).toLatin1();
-    }
-    else {
-        _idNumber = 999;
-        _idLetter = ' ';
+        if (!ok || _idNumber < 1) {
+            // Ancien fallback historique (ids non numériques)
+            _idNumber = 999;
+        }
     }
     buildId();
     _categ = json.value("categ").toString("?");

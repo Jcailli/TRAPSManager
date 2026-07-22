@@ -5,6 +5,7 @@
 #include <QAbstractListModel>
 #include "bib.h"
 #include <QJsonArray>
+#include <QJsonObject>
 #include "Database/database.h"
 #include "penaltylistmodel.h"
 
@@ -81,6 +82,7 @@ public slots:
 
     void processPCE(const QString& filename, bool reset=true);
     void processTXT(const QString& filename, bool reset=true);
+    void processCompetFFCKList(const QJsonArray &bibs);
     void clearPenalties();
     void clearChronos();
 
