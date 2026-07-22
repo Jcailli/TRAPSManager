@@ -4,6 +4,8 @@
 #include <QSettings>
 #include <QDateTime>
 #include "global.h"
+#include "DeviceManager/devicemanager.h"
+#include "DeviceManager/deviceconnectionserver.h"
 
 ViewController::ViewController(const QStringList& hostList, int requestedTcpPort) : QObject(),
     _fontSize(18),
@@ -12,10 +14,13 @@ ViewController::ViewController(const QStringList& hostList, int requestedTcpPort
     _hostList(hostList),
     _requestedTcpPort(requestedTcpPort),
     _runningTcpPort(0),
-    _gateCount(25),
     _competitionMode(0),
     _kayakCrossPostCount(5),
-    _kayakCrossPostTypes(QStringList())
+    _kayakCrossPostTypes(QStringList()),
+    _gateCount(25),
+    _deviceConnectionPort(8081),
+    _deviceManager(new DeviceManager(this)),
+    _deviceConnectionServer(new DeviceConnectionServer(this))
 
 {
     QQmlEngine::setObjectOwnership(this, QQmlEngine::CppOwnership);
@@ -36,7 +41,19 @@ ViewController::ViewController(const QStringList& hostList, int requestedTcpPort
     qDebug() << "kayakCrossPostCount:" << _kayakCrossPostCount;
     _kayakCrossPostTypes = settings.value("kayakCrossPostTypes", QVariant(QStringList())).toStringList();
     qDebug() << "kayakCrossPostTypes:" << _kayakCrossPostTypes;
+    _deviceConnectionPort = settings.value("deviceConnectionPort", QVariant(8081)).toInt();
+    qDebug() << "deviceConnectionPort:" << _deviceConnectionPort;
 
+    // Start device connection server
+    if (_deviceConnectionServer->startServer(_deviceConnectionPort)) {
+        qDebug() << "Device connection server started on port" << _deviceConnectionPort;
+        _runningTcpPort = _deviceConnectionPort;
+    } else {
+        qWarning() << "Failed to start device connection server";
+    }
+
+    connect(_deviceConnectionServer, &DeviceConnectionServer::toast,
+            this, &ViewController::toast);
 }
 
 void ViewController::setBibCount(int bibCount) {
@@ -245,6 +262,10 @@ void ViewController::printError(const QString &title, const QString &message) {
     openDialogBox(dialogBox);
 }
 
+void ViewController::showToast(const QString &text, int delay) {
+    emit toast(text, delay);
+}
+
 void ViewController::broadcastError() {
     DialogBox* dialogBox = new DialogBox("Problème réseau - TRAPS Manager doit redémarrer",
                                          "TRAPS Manager ne parvient plus à se faire connaitre sur le réseau (problème de broadcast).\nL'application va se fermer, veuillez la redémarrer.\nAucune donnée ne sera perdue pendant le temps de redémarrage.",
@@ -265,9 +286,12 @@ void ViewController::setTcpPort(int tcpPort) {
 void ViewController::viewReady() {
     if (_hostList.count()==1) {  // only one network on this machine
         _selectedHost = _hostList.value(0);
-        qDebug() << "Requesting TCP server on: " << _selectedHost << ":"<< _requestedTcpPort;
+        qDebug() << "Selected network:" << _selectedHost
+                 << "- device server port:" << _deviceConnectionPort;
+        _runningTcpPort = _deviceConnectionPort;
+        refreshStatusText();
         emit selectedAddress(_selectedHost);
-        emit requestTcpServer(_selectedHost, _requestedTcpPort);
+        emit deviceConnectionPortChanged(_deviceConnectionPort);
     }
     else if (_hostList.count()==0) {
         qDebug() << "No network, Abort";
@@ -292,10 +316,12 @@ void ViewController::viewReady() {
         dialogBox->onButtonClicked([this, dialogBox](int index) {
             dialogBox->deleteLater();
             _selectedHost = _hostList.value(index);
-            qDebug() << "Selected ip address: " << _selectedHost;
-            qDebug() << "Requesting TCP server on: " << _selectedHost << ":"<< _requestedTcpPort;
+            qDebug() << "Selected ip address: " << _selectedHost
+                     << "- device server port:" << _deviceConnectionPort;
+            _runningTcpPort = _deviceConnectionPort;
+            refreshStatusText();
             emit this->selectedAddress(_selectedHost);
-            emit this->requestTcpServer(_selectedHost, _requestedTcpPort);
+            emit this->deviceConnectionPortChanged(_deviceConnectionPort);
 
         });
         openDialogBox(dialogBox);
@@ -590,4 +616,46 @@ void ViewController::refreshStatusText() {
     if (_hostList.count()==0) _statusText = "Aucun réseau disponible. Redémarrez l'application.";
     else _statusText = QString("En écoute des TRAPS sur %1:%2").arg(_selectedHost).arg(_runningTcpPort);
     emit statusTextChanged(_statusText);
+}
+
+DeviceManager* ViewController::devicemanager() const {
+    return _deviceManager;
+}
+
+DeviceConnectionServer* ViewController::deviceConnectionServer() const {
+    return _deviceConnectionServer;
+}
+
+int ViewController::deviceConnectionPort() const {
+    return _deviceConnectionPort;
+}
+
+void ViewController::setDeviceConnectionPort(int port) {
+    if (_deviceConnectionPort != port) {
+        _deviceConnectionPort = port;
+        
+        // Sauvegarder dans les paramètres
+        QSettings settings;
+        settings.setValue("deviceConnectionPort", _deviceConnectionPort);
+        
+        // Redémarrer le serveur avec le nouveau port
+        _deviceConnectionServer->stopServer();
+        if (_deviceConnectionServer->startServer(_deviceConnectionPort)) {
+            qDebug() << "Device connection server restarted on port" << _deviceConnectionPort;
+            _runningTcpPort = _deviceConnectionPort;
+            refreshStatusText();
+        } else {
+            qWarning() << "Failed to restart device connection server on port" << _deviceConnectionPort;
+        }
+        
+        emit deviceConnectionPortChanged(_deviceConnectionPort);
+    }
+}
+
+void ViewController::broadcastBibListToDevices() {
+    emit requestBroadcastBibList(QString());
+}
+
+void ViewController::sendBibListToDevice(const QString &deviceId) {
+    emit requestBroadcastBibList(deviceId);
 }

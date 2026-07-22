@@ -76,6 +76,7 @@ public slots:
     void forwardBib(int firstRow, int lastRow);
 
     QJsonArray jsonArray(qint64 timestamp) const;
+    QJsonArray bibListForDevices() const;
     QList<int> bibNumberList() const;
 
     void processPCE(const QString& filename, bool reset=true);

@@ -23,6 +23,8 @@
 #include "CompetFFCK/competffck.h"
 #include <QThread>
 #include <QStandardPaths>
+#include <QJsonArray>
+#include "DeviceManager/deviceconnectionserver.h"
 
 // Controller for static files
 stefanfrings::StaticFileController* staticFileController;
@@ -129,14 +131,14 @@ int main(int argc, char *argv[]) {
     QObject::connect(&viewController, &ViewController::requestChronoClear, &bibList, &BibList::clearChronos);
     QObject::connect(&viewController, &ViewController::requestExportAllData, &bibList, &BibList::exportAllData);
 
-    // ViewController - TCPServer
-    QObject::connect(&viewController, &ViewController::requestTcpServer, &tcpServer, &TCPServer::start);
+    // ViewController - TCPServer (DÉSACTIVÉ - Utilise le nouveau DeviceConnectionServer)
+    // QObject::connect(&viewController, &ViewController::requestTcpServer, &tcpServer, &TCPServer::start);
 
-    // TCPServer - Viewcontroller
-    QObject::connect(&tcpServer, &TCPServer::serverStarted, &viewController, &ViewController::setTcpPort);
-    QObject::connect(&tcpServer, &TCPServer::serverStarted, &hello, &HelloBroadcaster::setTcpPort);
+    // TCPServer - Viewcontroller (DÉSACTIVÉ - Utilise le nouveau DeviceConnectionServer)
+    // QObject::connect(&tcpServer, &TCPServer::serverStarted, &viewController, &ViewController::setTcpPort);
+    // QObject::connect(&tcpServer, &TCPServer::serverStarted, &hello, &HelloBroadcaster::setTcpPort);
 
-    QObject::connect(&tcpServer, &TCPServer::startFailure, &viewController, &ViewController::tcpServerStarFailure);
+    // QObject::connect(&tcpServer, &TCPServer::startFailure, &viewController, &ViewController::tcpServerStarFailure);
 
     // BibList - ViewController
     QObject::connect(&bibList, &BibList::bibCountChanged, &viewController, &ViewController::setBibCount);
@@ -152,6 +154,24 @@ int main(int argc, char *argv[]) {
     QObject::connect(&hello, &HelloBroadcaster::broadcastError, &viewController, &ViewController::broadcastError);
     QObject::connect(&hello, &HelloBroadcaster::sayHello, &viewController, &ViewController::watchdog);
     QObject::connect(&viewController, &ViewController::selectedAddress, &hello, &HelloBroadcaster::setAddress);
+    QObject::connect(&viewController, &ViewController::deviceConnectionPortChanged, &hello, &HelloBroadcaster::setTcpPort);
+
+    // Envoi de la liste de dossards vers les appareils autorisés/connectés
+    QObject::connect(&viewController, &ViewController::requestBroadcastBibList,
+                     [&viewController, &bibList](const QString &deviceId) {
+        const QJsonArray bibs = bibList.bibListForDevices();
+        if (bibs.isEmpty()) {
+            viewController.showToast("Aucun dossard à envoyer (chargez un PCE/CSV d'abord)", 4000);
+            return;
+        }
+        DeviceConnectionServer* server = viewController.deviceConnectionServer();
+        if (!server)
+            return;
+        if (deviceId.isEmpty())
+            server->broadcastBibList(bibs);
+        else
+            server->sendBibListToDevice(deviceId, bibs);
+    });
 
 
     QQmlApplicationEngine engine;

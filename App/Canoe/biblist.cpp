@@ -8,6 +8,8 @@
 #include <QFileInfo>
 #include <QDir>
 #include <QUrl>
+#include <QJsonObject>
+#include <QJsonArray>
 #include <algorithm>
 #include "Database/database.h"
 
@@ -448,9 +450,24 @@ void BibList::forwardBib(int firstRow, int lastRow) {
 
 }
 
-QJsonArray BibList::jsonArray(qint64 timestamp = 0) const {
-    QJsonArray array;
+QJsonArray BibList::jsonArray(qint64 timestamp) const {
+    Q_UNUSED(timestamp);
+    return bibListForDevices();
+}
 
+QJsonArray BibList::bibListForDevices() const {
+    QJsonArray array;
+    foreach (Bib* bib, _bibList) {
+        if (!bib)
+            continue;
+        QJsonObject obj;
+        obj.insert("bib", bib->idNumber());
+        obj.insert("id", bib->id());
+        obj.insert("categ", bib->categ());
+        obj.insert("schedule", bib->schedule());
+        obj.insert("entry", bib->entry());
+        array.append(obj);
+    }
     return array;
 }
 

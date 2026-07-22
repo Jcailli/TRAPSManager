@@ -37,5 +37,6 @@
         <file>trapsmanager.json</file>
         <file>qml/Popup.qml</file>
         <file>qml/KayakCrossPostConfig.qml</file>
+        <file>qml/DeviceManagerPanel.qml</file>
     </qresource>
 </RCC>

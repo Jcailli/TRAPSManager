@@ -35,7 +35,10 @@ HEADERS += \
     Canoe/penaltylistmodel.h \
     Update/softwareupdate.h \
     Network/jsonnetworkmanager.h \
-    Network/jsonnetworkreply.h
+    Network/jsonnetworkreply.h \
+    DeviceManager/devicemanager.h \
+    DeviceManager/deviceconnectionserver.h \
+    DeviceManager/deviceallowlist.h
 
 
 SOURCES += \
@@ -65,7 +68,10 @@ SOURCES += \
     Canoe/penaltylistmodel.cpp \
     Update/softwareupdate.cpp \
     Network/jsonnetworkreply.cpp \
-    Network/jsonnetworkmanager.cpp
+    Network/jsonnetworkmanager.cpp \
+    DeviceManager/devicemanager.cpp \
+    DeviceManager/deviceconnectionserver.cpp \
+    DeviceManager/deviceallowlist.cpp
 
 
 

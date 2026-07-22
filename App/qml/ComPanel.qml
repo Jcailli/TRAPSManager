@@ -23,6 +23,7 @@ FocusScope {
         id: headerModel
         ListElement { name:"CompetFFCK"; image:""; imageSelected:"" }
         ListElement { name:"Kayak Cross"; image:""; imageSelected:"" }
+        ListElement { name:"Appareils"; image:""; imageSelected:"" }
         
         Component.onCompleted: {
             updateKayakCrossVisibility()
@@ -32,12 +33,12 @@ FocusScope {
             var isKayakCrossMode = viewcontroller.competitionMode === 2
             if (isKayakCrossMode) {
                 // Afficher l'onglet Kayak Cross
-                if (count === 1) {
-                    append({ name:"Kayak Cross", image:"", imageSelected:"" })
+                if (count === 2) {
+                    insert(1, { name:"Kayak Cross", image:"", imageSelected:"" })
                 }
             } else {
                 // Masquer l'onglet Kayak Cross
-                if (count === 2) {
+                if (count === 3) {
                     remove(1)
                     // Revenir à l'onglet CompetFFCK si on était sur Kayak Cross
                     if (comTitle.currentIndex === 1) {
@@ -337,27 +338,42 @@ FocusScope {
 
 
     Behavior on y {
-        NumberAnimation { duration: 300; easing.type: Easing.OutCubic }
+        NumberAnimation { duration: 300; easing.type: Easing.OutCubic         }
+    }
+
+    // Panneau de gestion des appareils
+    DeviceManagerPanel {
+        id: deviceManagerPanel
+        anchors.top: comTitle.bottom
+        anchors.bottom: parent.bottom
+        anchors.left: parent.left
+        anchors.right: parent.right
+        visible: false
     }
 
     function displayPanel(buttonIndex) {
         // Masquer tous les panneaux
         competFFCKPanel.visible = false
         kayakCrossPanel.visible = false
+        deviceManagerPanel.visible = false
         
-        if (buttonIndex===0) {
+        if (buttonIndex === 0) {
+            // Toujours CompetFFCK en premier
             competFFCKPanel.visible = true
         }
-        else if (buttonIndex===1 && isKayakCrossMode) {
-            kayakCrossPanel.visible = true
-            // Initialiser la configuration à partir des données existantes
-            initializeFromCurrentConfig()
+        else if (buttonIndex === 1) {
+            if (isKayakCrossMode) {
+                // Mode Kayak Cross : afficher le panneau Kayak Cross
+                kayakCrossPanel.visible = true
+                initializeFromCurrentConfig()
+            } else {
+                // Mode normal : afficher le panneau Appareils
+                deviceManagerPanel.visible = true
+            }
         }
-        else if (buttonIndex===1 && !isKayakCrossMode) {
-            // Si on essaie d'accéder à Kayak Cross mais que ce n'est pas le bon mode,
-            // revenir à CompetFFCK
-            competFFCKPanel.visible = true
-            comTitle.currentIndex = 0
+        else if (buttonIndex === 2 && isKayakCrossMode) {
+            // Mode Kayak Cross : afficher le panneau Appareils
+            deviceManagerPanel.visible = true
         }
     }
     

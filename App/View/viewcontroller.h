@@ -4,6 +4,8 @@
 #include <QObject>
 #include "View/dialogbox.h"
 #include "View/filechooser.h"
+#include "DeviceManager/devicemanager.h"
+#include "DeviceManager/deviceconnectionserver.h"
 
 class ViewController : public QObject
 {
@@ -20,6 +22,9 @@ class ViewController : public QObject
     Q_PROPERTY(int competitionMode READ competitionMode NOTIFY competitionModeChanged)
     Q_PROPERTY(int kayakCrossPostCount READ kayakCrossPostCount NOTIFY kayakCrossPostCountChanged)
     Q_PROPERTY(QStringList kayakCrossPostTypes READ kayakCrossPostTypes NOTIFY kayakCrossPostTypesChanged)
+    Q_PROPERTY(DeviceManager* devicemanager READ devicemanager CONSTANT)
+    Q_PROPERTY(DeviceConnectionServer* deviceConnectionServer READ deviceConnectionServer CONSTANT)
+    Q_PROPERTY(int deviceConnectionPort READ deviceConnectionPort NOTIFY deviceConnectionPortChanged)
 
 
 public:
@@ -37,6 +42,9 @@ public:
     int competitionMode() const { return _competitionMode; }
     int kayakCrossPostCount() const { return _kayakCrossPostCount; }
     QStringList kayakCrossPostTypes() const { return _kayakCrossPostTypes; }
+    DeviceManager* devicemanager() const;
+    Q_INVOKABLE void broadcastBibListToDevices();
+    Q_INVOKABLE void sendBibListToDevice(const QString &deviceId);
 
 signals:
 
@@ -50,6 +58,7 @@ signals:
     void requestPenaltyClear();
     void requestChronoClear();
     void requestExportAllData(QString filename);
+    void requestBroadcastBibList(QString deviceId); // deviceId vide = tous
     void toast(QString text, int delay); // delay in msec
     void requestTcpServer(QString host, int port);
     void selectedAddress(QString host);
@@ -58,6 +67,7 @@ signals:
     void competitionModeChanged(int mode);
     void kayakCrossPostCountChanged(int postCount);
     void kayakCrossPostTypesChanged(QStringList postTypes);
+    void deviceConnectionPortChanged(int port);
     void watchdog();
     void openSoftwareUpdate();
     void checknewVersion(bool force);
@@ -98,10 +108,16 @@ public slots:
     void openKayakCrossPostConfig();
     void exportAllData();
     void printError(const QString& title, const QString& message);
+    void showToast(const QString& text, int delay = 3000);
     void broadcastError();
     void setTcpPort(int tcpPort);
+    void setDeviceConnectionPort(int port);
     void viewReady(); // called when QML Component.onCompleted is called
     void tcpServerStarFailure();
+
+    // Device management
+    DeviceConnectionServer* deviceConnectionServer() const;
+    int deviceConnectionPort() const;
 
 private:
 
@@ -116,17 +132,20 @@ private:
     int _competitionMode; // 0 = Individuel, 1 = Patrouille, 2 = Kayak Cross
     int _kayakCrossPostCount; // Nombre de postes (1-9)
     QStringList _kayakCrossPostTypes; // Types des postes
+    int _gateCount;
     DialogBox* _dialogBox;
     FileChooser* _fileChooser;
     bool _dialogBoxOpened;
     bool _fileChooserOpened;
     bool _showChrono;
-    int _gateCount;
 
     void refreshStatusText();
 
     int _appWindowWidth;
     int _appWindowHeight;
+    int _deviceConnectionPort;
+    DeviceManager* _deviceManager;
+    DeviceConnectionServer* _deviceConnectionServer;
 };
 
 #endif // VIEWCONTROLLER_H
