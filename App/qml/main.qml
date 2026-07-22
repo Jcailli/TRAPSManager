@@ -134,16 +134,9 @@ ApplicationWindow {
         nameFilters: ["Fichiers CSV (*.csv)", "Tous les fichiers (*)"]
         onAccepted: {
             viewcontroller.setFolder(fileDialog.fileUrls)
-            // Convertir l'URL en chemin de fichier local
-            var filePath = fileDialog.fileUrls[0].toString()
-            if (filePath.startsWith("file:///")) {
-                filePath = filePath.substring(8) // Enlever "file:///"
-            } else if (filePath.startsWith("file://")) {
-                filePath = filePath.substring(7) // Enlever "file://"
-            }
-            // Remplacer les slashes par des backslashes sur Windows
-            filePath = filePath.replace(/\//g, "\\")
-            viewcontroller.selectedFilePath(filePath)
+            // Laisser C++ convertir file:// → chemin local (évite le bug
+            // QUrl::toLocalFile() vide sur un chemin Windows déjà "C:\...")
+            viewcontroller.selectedFilePath(fileDialog.fileUrls[0].toString())
         }
         onRejected: viewcontroller.selectedFilePath("")
 

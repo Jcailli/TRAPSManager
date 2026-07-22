@@ -7,6 +7,7 @@
 #include <QTextStream>
 #include <QFileInfo>
 #include <QDir>
+#include <QUrl>
 #include <algorithm>
 #include "Database/database.h"
 
@@ -14,6 +15,16 @@
 #define DB_LOCKS "locks"
 #define DB_TIMES "times"
 #define DB_PENALTIES "penalties"
+
+namespace {
+// QUrl::toLocalFile() renvoie vide sur un chemin Windows déjà local (C:\...).
+// Accepte soit une URL file://, soit un chemin natif.
+QString localFilePath(const QString& filename) {
+    if (filename.startsWith(QLatin1String("file:")))
+        return QUrl(filename).toLocalFile();
+    return filename;
+}
+}
 
 
 BibList::BibList() : QAbstractListModel(),
@@ -95,13 +106,13 @@ void BibList::processPCE(const QString &filename, bool reset) {
         return;
     }
 
-    QString path = QUrl(filename).toLocalFile();
-    qDebug() << "Loading bib list from: " << path;
+    QString path = localFilePath(filename);
+    qDebug() << "Loading bib list from: " << path << "(raw:" << filename << ")";
     QFile file(path);
     // use QFile::exists("blabla"); !
-    if (!file.open(QFile::ReadOnly)) {
+    if (path.isEmpty() || !file.open(QFile::ReadOnly)) {
         qDebug() << "Cannot open file " << path;
-        emit error("Chargement fichier PCE", QString("Impossible d'ouvrir le fichier\n%0").arg(path));
+        emit error("Chargement fichier PCE", QString("Impossible d'ouvrir le fichier\n%0").arg(path.isEmpty() ? filename : path));
         return;
     }
 
@@ -193,13 +204,13 @@ void BibList::processTXT(const QString& filename, bool reset) {
         return;
     }
 
-    QString path = QUrl(filename).toLocalFile();
-    qDebug() << "Loading bib list from: " << path;
+    QString path = localFilePath(filename);
+    qDebug() << "Loading bib list from: " << path << "(raw:" << filename << ")";
     QFile file(path);
     // use QFile::exists("blabla"); !
-    if (!file.open(QFile::ReadOnly)) {
+    if (path.isEmpty() || !file.open(QFile::ReadOnly)) {
         qDebug() << "Cannot open file " << path;
-        emit error("Chargement fichier CSV", QString("Impossible d'ouvrir le fichier\n%0").arg(path));
+        emit error("Chargement fichier CSV", QString("Impossible d'ouvrir le fichier\n%0").arg(path.isEmpty() ? filename : path));
         return;
     }
 
@@ -574,15 +585,12 @@ void BibList::exportAllData(const QString& filename) {
         return;
     }
     
-    // Nettoyer le chemin de fichier (enlever les préfixes file://)
-    QString cleanFilename = filename;
-    if (cleanFilename.startsWith("file:///")) {
-        cleanFilename = cleanFilename.mid(8);
-    } else if (cleanFilename.startsWith("file://")) {
-        cleanFilename = cleanFilename.mid(7);
+    QString cleanFilename = localFilePath(filename);
+    qDebug() << "Cleaned filename:" << cleanFilename << "(raw:" << filename << ")";
+    if (cleanFilename.isEmpty()) {
+        emit error("Export impossible", QString("Chemin de fichier invalide:\n%0").arg(filename));
+        return;
     }
-    
-    qDebug() << "Cleaned filename:" << cleanFilename;
     
     // Vérifier le mode de compétition
     QSettings settings;
