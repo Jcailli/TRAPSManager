@@ -41,11 +41,17 @@ public class PenaltyPad implements DialogInterface.OnMultiChoiceClickListener,
     private Map<Button, PenaltyButton> buttonMap = new HashMap<>();
     private int padCapacityUsed = SystemParam.MAX_GATE_PER_TERMINAL;
 
-    // --- Constantes KCross (Affichage seulement) ---
-    public static final int SECTOR_TYPE_GATE = 0;
+    // --- Constantes KCross (secteurs) ---
+    /** Bouée numérotée (ex-porte). */
+    public static final int SECTOR_TYPE_BUOY = 0;
+    /** @deprecated use SECTOR_TYPE_BUOY */
+    public static final int SECTOR_TYPE_GATE = SECTOR_TYPE_BUOY;
     public static final int SECTOR_TYPE_START = -1;
     public static final int SECTOR_TYPE_FINISH = -2;
-    public static final int SECTOR_TYPE_ESKIMO = -3;
+    /** Rollzone R (ex-esquimautage). */
+    public static final int SECTOR_TYPE_ROLLZONE = -3;
+    /** @deprecated use SECTOR_TYPE_ROLLZONE */
+    public static final int SECTOR_TYPE_ESKIMO = SECTOR_TYPE_ROLLZONE;
 
     // --- Valeurs de pénalité réelles (communes à Slalom et KCross) ---
     public static final int PENALTY_VALUE_0_CLR = 0;
@@ -83,22 +89,20 @@ public class PenaltyPad implements DialogInterface.OnMultiChoiceClickListener,
 
     private static class KCrossRowSetup {
         boolean isActive = false;
-        int sectorType = SECTOR_TYPE_GATE;
-        int gateNumber = 0; // 0-24, if sectorType is GATE
+        int sectorType = SECTOR_TYPE_BUOY;
+        int gateNumber = 0; // numéro de bouée 0-based si BUOY
         int currentPenaltyValue = -1;
-        // int originalConfigIndex; // Index de 0 à MAX_KCROSS_CONFIGURABLE_SECTORS - 1
 
-        public KCrossRowSetup(/*int originalConfigIndex*/) {
-            // this.originalConfigIndex = originalConfigIndex;
+        public KCrossRowSetup() {
         }
 
         String getDisplayName() {
             if (!isActive) return "";
             switch (sectorType) {
-                case SECTOR_TYPE_START: return "  S  ";
-                case SECTOR_TYPE_FINISH: return "  F  ";
-                case SECTOR_TYPE_ESKIMO: return "  E  ";
-                case SECTOR_TYPE_GATE:
+                case SECTOR_TYPE_START: return "  D  ";
+                case SECTOR_TYPE_FINISH: return "  A  ";
+                case SECTOR_TYPE_ROLLZONE: return "  R  ";
+                case SECTOR_TYPE_BUOY:
                     return (gateNumber < 9) ? "  0" + (gateNumber + 1) + "  " : "  " + (gateNumber + 1) + "  ";
                 default: return " ERR ";
             }
@@ -139,10 +143,13 @@ public class PenaltyPad implements DialogInterface.OnMultiChoiceClickListener,
                 }
             }
             if (!atLeastOneActive && !kCrossRowSetups.isEmpty()) {
+                // Secteur 1 = zone de départ par défaut
                 kCrossRowSetups.get(0).isActive = true;
-                kCrossRowSetups.get(0).sectorType = SECTOR_TYPE_GATE;
+                kCrossRowSetups.get(0).sectorType = SECTOR_TYPE_START;
                 kCrossRowSetups.get(0).gateNumber = 0;
             }
+            // Règle métier : secteur 0 toujours Départ s'il est actif
+            ensureFirstSectorIsStart();
 
             buildButtonMapKCross();
             applyKCrossConfigurationToUI();
@@ -543,9 +550,18 @@ public class PenaltyPad implements DialogInterface.OnMultiChoiceClickListener,
         }
     }
 
+    private void ensureFirstSectorIsStart() {
+        if (kCrossRowSetups.isEmpty()) {
+            return;
+        }
+        KCrossRowSetup first = kCrossRowSetups.get(0);
+        first.isActive = true;
+        first.sectorType = SECTOR_TYPE_START;
+    }
+
     private AlertDialog createKCrossConfigDialog(Activity activity) {
         AlertDialog.Builder builder = new AlertDialog.Builder(activity);
-        builder.setTitle("Configuration Secteurs KCross ("+MAX_KCROSS_CONFIGURABLE_SECTORS+" max)");
+        builder.setTitle("Configuration secteurs KCross");
 
         View dialogView = activity.getLayoutInflater().inflate(R.layout.dialog_kcross_gate_config, null);
         builder.setView(dialogView);
@@ -555,7 +571,8 @@ public class PenaltyPad implements DialogInterface.OnMultiChoiceClickListener,
         final Spinner[] numberSP = new Spinner[MAX_KCROSS_CONFIGURABLE_SECTORS];
         final TextView[] numberLabels = new TextView[MAX_KCROSS_CONFIGURABLE_SECTORS];
 
-        String[] typeItems = {"Porte", "Départ (S)", "Arrivée (F)", "Esquim. (E)"};
+        // Types pour secteurs 2+ : Bouée / Rollzone / Arrivée (secteur 1 = Départ fixe)
+        String[] typeItems = {"Bouée", "Rollzone (R)", "Arrivée (A)"};
         ArrayAdapter<String> typeAdapter = new ArrayAdapter<>(activity, android.R.layout.simple_spinner_item, typeItems);
         typeAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
 
@@ -563,6 +580,8 @@ public class PenaltyPad implements DialogInterface.OnMultiChoiceClickListener,
         for (int i = 0; i < SystemParam.GATE_COUNT; i++) numberItems[i] = String.valueOf(i + 1);
         ArrayAdapter<String> numberAdapter = new ArrayAdapter<>(activity, android.R.layout.simple_spinner_item, numberItems);
         numberAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+
+        ensureFirstSectorIsStart();
 
         for (int i = 0; i < MAX_KCROSS_CONFIGURABLE_SECTORS; i++) {
             try {
@@ -572,26 +591,42 @@ public class PenaltyPad implements DialogInterface.OnMultiChoiceClickListener,
                 numberLabels[i] = dialogView.findViewById(activity.getResources().getIdentifier("kcross_config_number_label_row_" + i, "id", activity.getPackageName()));
 
                 if (activeCB[i] == null || typeSP[i] == null || numberSP[i] == null) {
-                    Log.e("PenaltyPad", "KCross Dialog: View not found for row " + i + ". Check dialog_kcross_gate_config.xml");
+                    Log.e("PenaltyPad", "KCross Dialog: View not found for row " + i);
                     continue;
                 }
 
+                activeCB[i].setText("Secteur " + (i + 1) + ":");
                 typeSP[i].setAdapter(typeAdapter);
                 numberSP[i].setAdapter(numberAdapter);
 
                 KCrossRowSetup current = kCrossRowSetups.get(i);
-                activeCB[i].setChecked(current.isActive);
 
-                switch (current.sectorType) {
-                    case SECTOR_TYPE_START: typeSP[i].setSelection(1); break;
-                    case SECTOR_TYPE_FINISH: typeSP[i].setSelection(2); break;
-                    case SECTOR_TYPE_ESKIMO: typeSP[i].setSelection(3); break;
-                    default: typeSP[i].setSelection(0); break;
+                if (i == 0) {
+                    // Secteur 1 = zone de départ (fixe)
+                    activeCB[i].setChecked(true);
+                    activeCB[i].setEnabled(false);
+                    typeSP[i].setAdapter(new ArrayAdapter<>(activity, android.R.layout.simple_spinner_item,
+                            new String[]{"Départ (D)"}));
+                    typeSP[i].setEnabled(false);
+                    typeSP[i].setSelection(0);
+                    typeSP[i].setVisibility(View.VISIBLE);
+                    numberSP[i].setVisibility(View.GONE);
+                    if (numberLabels[i] != null) {
+                        numberLabels[i].setVisibility(View.GONE);
+                    }
+                    continue;
                 }
-                if (current.sectorType == SECTOR_TYPE_GATE && current.gateNumber >= 0 && current.gateNumber < SystemParam.GATE_COUNT) {
+
+                activeCB[i].setChecked(current.isActive);
+                switch (current.sectorType) {
+                    case SECTOR_TYPE_ROLLZONE: typeSP[i].setSelection(1); break;
+                    case SECTOR_TYPE_FINISH: typeSP[i].setSelection(2); break;
+                    default: typeSP[i].setSelection(0); break; // Bouée
+                }
+                if (current.sectorType == SECTOR_TYPE_BUOY && current.gateNumber >= 0 && current.gateNumber < SystemParam.GATE_COUNT) {
                     numberSP[i].setSelection(current.gateNumber);
                 } else {
-                    numberSP[i].setSelection(0);
+                    numberSP[i].setSelection(Math.min(i, SystemParam.GATE_COUNT - 1));
                 }
 
                 final int finalI = i;
@@ -600,7 +635,10 @@ public class PenaltyPad implements DialogInterface.OnMultiChoiceClickListener,
                     public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
                         boolean showNumber = activeCB[finalI].isChecked() && (position == 0);
                         numberSP[finalI].setVisibility(showNumber ? View.VISIBLE : View.GONE);
-                        if (numberLabels[finalI]!=null) numberLabels[finalI].setVisibility(showNumber ? View.VISIBLE : View.GONE);
+                        if (numberLabels[finalI] != null) {
+                            numberLabels[finalI].setVisibility(showNumber ? View.VISIBLE : View.GONE);
+                            numberLabels[finalI].setText("N° bouée:");
+                        }
                     }
                     @Override public void onNothingSelected(AdapterView<?> parent) {}
                 });
@@ -608,21 +646,27 @@ public class PenaltyPad implements DialogInterface.OnMultiChoiceClickListener,
                 activeCB[i].setOnCheckedChangeListener((buttonView, isChecked) -> {
                     typeSP[finalI].setEnabled(isChecked);
                     numberSP[finalI].setEnabled(isChecked);
-                    if (numberLabels[finalI]!=null) numberLabels[finalI].setEnabled(isChecked);
-
+                    if (numberLabels[finalI] != null) numberLabels[finalI].setEnabled(isChecked);
                     boolean showNumber = isChecked && (typeSP[finalI].getSelectedItemPosition() == 0);
                     numberSP[finalI].setVisibility(showNumber ? View.VISIBLE : View.GONE);
-                    if (numberLabels[finalI]!=null) numberLabels[finalI].setVisibility(showNumber ? View.VISIBLE : View.GONE);
+                    if (numberLabels[finalI] != null) {
+                        numberLabels[finalI].setVisibility(showNumber ? View.VISIBLE : View.GONE);
+                    }
                 });
 
                 boolean isRowActive = activeCB[i].isChecked();
                 typeSP[i].setEnabled(isRowActive);
                 numberSP[i].setEnabled(isRowActive);
-                if (numberLabels[i]!=null) numberLabels[i].setEnabled(isRowActive);
+                if (numberLabels[i] != null) {
+                    numberLabels[i].setEnabled(isRowActive);
+                    numberLabels[i].setText("N° bouée:");
+                }
 
                 boolean showNumberSpinnerInitially = isRowActive && (typeSP[i].getSelectedItemPosition() == 0);
                 numberSP[i].setVisibility(showNumberSpinnerInitially ? View.VISIBLE : View.GONE);
-                if (numberLabels[i]!=null) numberLabels[i].setVisibility(showNumberSpinnerInitially ? View.VISIBLE : View.GONE);
+                if (numberLabels[i] != null) {
+                    numberLabels[i].setVisibility(showNumberSpinnerInitially ? View.VISIBLE : View.GONE);
+                }
             } catch (Exception e) {
                 Log.e("PenaltyPad", "Error initializing dialog row " + i, e);
             }
@@ -630,35 +674,47 @@ public class PenaltyPad implements DialogInterface.OnMultiChoiceClickListener,
 
         builder.setPositiveButton("OK", (dialog, which) -> {
             int activeCount = 0;
+            int finishCount = 0;
             for (int i = 0; i < MAX_KCROSS_CONFIGURABLE_SECTORS; i++) {
                 if (activeCB[i] == null) continue;
-                if (activeCB[i].isChecked()) activeCount++;
+                if (i == 0 || activeCB[i].isChecked()) activeCount++;
+                if (i > 0 && activeCB[i].isChecked() && typeSP[i].getSelectedItemPosition() == 2) {
+                    finishCount++;
+                }
             }
 
-            if (activeCount > SystemParam.MAX_GATE_PER_TERMINAL && activeCount > 0) { // Seuil d'alerte
-                 Utility.alert(activity, "Attention: " + activeCount + " secteurs actifs, seuls les " + SystemParam.MAX_GATE_PER_TERMINAL + " premiers seront affichés.", "Alerte");
-            } else if (activeCount == 0) {
-                // Permettre 0 actif, mais peut-être avertir ?
-                // Utility.alert(activity, "Aucun secteur actif. Le pad sera vide.", "Info");
+            if (activeCount > SystemParam.MAX_GATE_PER_TERMINAL) {
+                Utility.alert(activity, "Attention",
+                        activeCount + " secteurs actifs, seuls les " + SystemParam.MAX_GATE_PER_TERMINAL + " premiers seront affichés.");
             }
-
+            if (finishCount > 1) {
+                Utility.alert(activity, "Attention", "Une seule Arrivée (A) est recommandée.");
+            }
 
             for (int i = 0; i < MAX_KCROSS_CONFIGURABLE_SECTORS; i++) {
                 if (activeCB[i] == null) continue;
                 KCrossRowSetup setup = kCrossRowSetups.get(i);
+                if (i == 0) {
+                    setup.isActive = true;
+                    setup.sectorType = SECTOR_TYPE_START;
+                    continue;
+                }
                 setup.isActive = activeCB[i].isChecked();
                 if (setup.isActive) {
                     int typePos = typeSP[i].getSelectedItemPosition();
                     if (typePos == 0) {
-                        setup.sectorType = SECTOR_TYPE_GATE;
+                        setup.sectorType = SECTOR_TYPE_BUOY;
                         setup.gateNumber = numberSP[i].getSelectedItemPosition();
-                    } else if (typePos == 1) setup.sectorType = SECTOR_TYPE_START;
-                    else if (typePos == 2) setup.sectorType = SECTOR_TYPE_FINISH;
-                    else if (typePos == 3) setup.sectorType = SECTOR_TYPE_ESKIMO;
+                    } else if (typePos == 1) {
+                        setup.sectorType = SECTOR_TYPE_ROLLZONE;
+                    } else {
+                        setup.sectorType = SECTOR_TYPE_FINISH;
+                    }
                 }
             }
+            ensureFirstSectorIsStart();
             saveKCrossConfigToPrefs();
-            applyKCrossConfigurationToUI(); // Crucial pour rafraîchir l'affichage du pad
+            applyKCrossConfigurationToUI();
         });
         builder.setNegativeButton("Annuler", null);
         return builder.create();
@@ -693,15 +749,21 @@ public class PenaltyPad implements DialogInterface.OnMultiChoiceClickListener,
             KCrossRowSetup setup = new KCrossRowSetup();
             if (i < savedConfigCount && prefs.contains(KEY_KCROSS_ROW_ACTIVE_ + i)) {
                 setup.isActive = prefs.getBoolean(KEY_KCROSS_ROW_ACTIVE_ + i, false);
-                setup.sectorType = prefs.getInt(KEY_KCROSS_ROW_TYPE_ + i, SECTOR_TYPE_GATE);
+                setup.sectorType = prefs.getInt(KEY_KCROSS_ROW_TYPE_ + i, SECTOR_TYPE_BUOY);
                 setup.gateNumber = prefs.getInt(KEY_KCROSS_ROW_NUMBER_ + i, i);
+                // Migration : ancien type « Porte » / « Esquim. » conservés via mêmes codes BUOY / ROLLZONE
+                if (setup.sectorType == SECTOR_TYPE_START && i > 0) {
+                    // Départ hors secteur 1 → traiter comme bouée
+                    setup.sectorType = SECTOR_TYPE_BUOY;
+                }
             } else {
                 setup.isActive = false;
-                setup.sectorType = SECTOR_TYPE_GATE;
+                setup.sectorType = SECTOR_TYPE_BUOY;
                 setup.gateNumber = i;
             }
             kCrossRowSetups.add(setup);
         }
+        ensureFirstSectorIsStart();
     }
 
     @Override

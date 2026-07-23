@@ -98,6 +98,14 @@ public class ModeSelectActivity extends AppCompatActivity {
         editor.putInt(ConnectActivity.PREF_COMPETITION_MODE, mode);
         editor.apply();
 
+        // Aligne le layout pénalités avec le mode (KCross → pad secteurs)
+        String layout = (mode == MODE_KCROSS)
+                ? TerminalConfigActivity.LAYOUT_MODE_KCROSS
+                : TerminalConfigActivity.LAYOUT_MODE_SLALOM;
+        getSharedPreferences("SETTINGS_TRANSFER", MODE_PRIVATE).edit()
+                .putString(TerminalConfigActivity.KEY_PENALTY_LAYOUT_MODE, layout)
+                .apply();
+
         Intent intent = new Intent(this, JudgeHubActivity.class);
         intent.putExtra(ConnectActivity.PREF_COMPETITION_MODE, mode);
         startActivity(intent);

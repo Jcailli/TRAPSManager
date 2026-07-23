@@ -21,6 +21,7 @@ import android.widget.CompoundButton.OnCheckedChangeListener;
 import android.widget.EditText;
 import android.widget.RadioButton;
 
+import com.traps.trapsapp.core.CompetitionModeHelper;
 import com.traps.trapsapp.core.IPAddressHelper;
 import com.traps.trapsapp.core.Utility;
 import com.traps.trapsapp.core.WIFIActivatingTask;
@@ -118,19 +119,38 @@ public class TerminalConfigActivity extends AppCompatActivity { // Removed OnCli
         kCrossButton = (Button) findViewById(R.id.kCrossButton);
         slalomButton = (Button) findViewById(R.id.slalomButton);
 
-        kCrossButton.setOnClickListener(new OnClickListener() {
-            @Override
-            public void onClick(View v) {
-                saveSettingsAndProceed(LAYOUT_MODE_KCROSS);
+        // Mode compétition (ModeSelect) : un seul bouton Continuer, layout forcé
+        if (!chronoConfig) {
+            if (CompetitionModeHelper.isKCross(this)) {
+                slalomButton.setVisibility(View.GONE);
+                kCrossButton.setText("Continuer");
+                kCrossButton.setOnClickListener(new OnClickListener() {
+                    @Override
+                    public void onClick(View v) {
+                        saveSettingsAndProceed(LAYOUT_MODE_KCROSS);
+                    }
+                });
+            } else {
+                kCrossButton.setVisibility(View.GONE);
+                slalomButton.setText("Continuer");
+                slalomButton.setOnClickListener(new OnClickListener() {
+                    @Override
+                    public void onClick(View v) {
+                        saveSettingsAndProceed(LAYOUT_MODE_SLALOM);
+                    }
+                });
             }
-        });
-
-        slalomButton.setOnClickListener(new OnClickListener() {
-            @Override
-            public void onClick(View v) {
-                saveSettingsAndProceed(LAYOUT_MODE_SLALOM);
-            }
-        });
+        } else {
+            // Chronos : pas de choix de pad
+            kCrossButton.setVisibility(View.GONE);
+            slalomButton.setText("Continuer");
+            slalomButton.setOnClickListener(new OnClickListener() {
+                @Override
+                public void onClick(View v) {
+                    saveSettingsAndProceed(LAYOUT_MODE_SLALOM);
+                }
+            });
+        }
         
         processCheckChanged();
          

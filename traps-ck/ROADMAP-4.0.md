@@ -1,7 +1,7 @@
 # Roadmap TRAPS-CK 4.0
 
 Document de cadrage pour l’évolution de l’application Android juges (`traps-ck/`).  
-Dernière mise à jour : **2026-07-23** (Phase C livrée).
+Dernière mise à jour : **2026-07-23** (Phase C2 KCross secteurs).
 
 ---
 
@@ -13,10 +13,11 @@ Aligner TRAPS-CK sur TRAPSManager moderne :
 - **liste de dossards** poussée par le Manager ;
 - **synchronisation de la base de temps** pilotée par le Manager (pour **toutes** les données horodatées).
 
-**UI métier** : inchangée pour Individuel, KCross Trial et Départ patrouille.  
-**Exceptions** (seules adaptations UI juges) :
+**UI métier** : inchangée pour Individuel, Départ patrouille.  
+**Exceptions** (adaptations UI juges) :
 - Patrouille — **Pénalités** : UI **A/B/C**
 - Patrouille — **Arrivée** : UI **Arrivée 1** + **Arrivée 3**
+- KCross — **Pénalités** : UI **secteurs** (Départ / Bouée / Rollzone / Arrivée), boutons **CLR/FLT/RAL**
 
 ---
 
@@ -40,7 +41,8 @@ Aligner TRAPS-CK sur TRAPSManager moderne :
 | Sujet | Décision |
 |--------|----------|
 | UI Individuel | **Inchangée** |
-| UI KCross (Trial) | **Inchangée** |
+| UI KCross (Trial) — pénalités | **Adaptée secteurs** (D / bouée N / R / A) ; CLR/FLT/RAL → 0/2/50 |
+| UI KCross — départ / arrivée chrono | **Inchangée** |
 | UI Patrouille — Départ | **Inchangée** |
 | UI Patrouille — Pénalités | **Adaptée A/B/C** |
 | UI Patrouille — Arrivée | **Adaptée Arrivée 1 + Arrivée 3** |
@@ -125,7 +127,8 @@ Détail du protocole à documenter dans `trapsmanager/docs/protocole-appareils-t
 | Mode / action | UI métier | Encodage → Manager |
 |---------------|-----------|---------------------|
 | Individuel — pénalités / départ / arrivée | **Inchangée** | Clés = n° porte ; chronos classiques |
-| KCross Trial — tout | **Inchangée** | Selon postes locaux |
+| KCross Trial — pénalités | **Adaptée secteurs** (D / bouée / R / A) | Index secteur ; valeurs 0/2/50 |
+| KCross Trial — départ / arrivée chrono | **Inchangée** | Chronos classiques |
 | Patrouille — **Départ** | **Inchangée** | Start time classique |
 | Patrouille — **Pénalités** | **Adaptée A/B/C** | Clés plates `1A=1, 1B=2, 1C=3…` |
 | Patrouille — **Arrivée** | **Adaptée Arrivée 1 + Arrivée 3** | Deux finish (1er / 3ème) → colonnes Manager |
@@ -157,12 +160,18 @@ Le **mode choisi sur le téléphone** doit rester cohérent avec le mode configu
 - [x] Pénalités patrouille : UI **A/B/C** (jusqu’à 5 portes) + envoi clés plates vers Manager
 - [x] Arrivée patrouille : UI **Arrivée 1** + **Arrivée 3** + mapping colonnes Manager (`finishRole`) + écart
 - [x] Départ patrouille : conserver UI actuelle
-- [x] Individuel / KCross Trial : flux inchangé (mode non patrouille)
+- [x] Individuel : flux inchangé ; KCross pénalités → **Phase C2**
 - [x] **Cadenas** : verrouillage auto après envoi ; confirmation au **déverrouillage** ; confirmation aux **flèches** si données modifiées ; **pas** de confirm à chaque touche
 - [x] Arrivée patrouille : après unlock, reprendre A1 **et** A3 ; contrainte **A1 ≤ A3** ; flèches navigables même cadenas fermé
 - [x] `loadBibList` : remplace la liste et **réinitialise** pénalités / départ / arrivée / cadenas
 - [x] Flèches pénalités : hauteur adaptative (min–max) selon nombre de portes (individuel / patrouille / KCross)
 - [x] Manager : colonnes Arrivée 1 / 3 / Écart + fenêtre Appareils indépendante (commit séparé)
+
+### Phase C2 — KCross secteurs (pénalités)
+- [x] Mode KCross → Pénalités ouvre le pad **KCross** (plus de choix Slalom/KCross dans TerminalConfig)
+- [x] Modèle **secteurs** : secteur 1 = **Départ (D)** ; autres = **Bouée** N / **Rollzone (R)** / **Arrivée (A)**
+- [x] Affichage **CLR / FLT / RAL** ; transfert **0 / 2 / 50** vers Manager / CompetFFCK
+- [x] Config locale secteurs (dialog) alignée sur ce vocabulaire
 
 ### Phase D — Sync base de temps
 - [ ] Protocole `syncTime` / offset (Manager + app)

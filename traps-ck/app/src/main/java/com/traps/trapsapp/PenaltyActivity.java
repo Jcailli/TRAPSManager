@@ -84,12 +84,21 @@ public class PenaltyActivity extends AppCompatActivity implements DialogInterfac
 		super.onCreate(savedInstanceState);
 		setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_PORTRAIT);
 		
-        // Read the penalty layout mode from SharedPreferences
+        // Layout pad : mode compétition KCross impose le pad secteurs (pas le choix TerminalConfig)
         SharedPreferences transferSettings = getSharedPreferences("SETTINGS_TRANSFER", MODE_PRIVATE);
-        penaltyLayoutMode = transferSettings.getString(
-            TerminalConfigActivity.KEY_PENALTY_LAYOUT_MODE, 
-            TerminalConfigActivity.LAYOUT_MODE_SLALOM // Default to slalom if not found
-        );
+        if (CompetitionModeHelper.isKCross(this)) {
+            penaltyLayoutMode = TerminalConfigActivity.LAYOUT_MODE_KCROSS;
+            transferSettings.edit()
+                    .putString(TerminalConfigActivity.KEY_PENALTY_LAYOUT_MODE,
+                            TerminalConfigActivity.LAYOUT_MODE_KCROSS)
+                    .apply();
+        } else {
+            penaltyLayoutMode = TerminalConfigActivity.LAYOUT_MODE_SLALOM;
+            transferSettings.edit()
+                    .putString(TerminalConfigActivity.KEY_PENALTY_LAYOUT_MODE,
+                            TerminalConfigActivity.LAYOUT_MODE_SLALOM)
+                    .apply();
+        }
 
 		// if permanent menu key, remove title 
 		if(Build.VERSION.SDK_INT <= 10 || (Build.VERSION.SDK_INT >= 14 &&    
