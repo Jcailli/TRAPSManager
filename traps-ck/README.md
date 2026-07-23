@@ -41,3 +41,11 @@ git clone [URL_DU_REPO]
 
 3. Avec docker pour compiler :<br>
       docker run --rm  -v ./:/app android_builder gradle assembleRelease --stacktrace -x lint
+
+## Dépannage Gradle
+
+Si le daemon échoue avec `Could not extract native JNI library` / chemin sous `gradle/wrapper/native` :
+1. Fermer Android Studio
+2. Vérifier **Settings → Build → Gradle → Gradle user home** = `C:\Users\<user>\.gradle` (pas `traps-ck\gradle\wrapper`)
+3. Supprimer la pollution éventuelle dans `gradle/wrapper/` (garder seulement `gradle-wrapper.jar` et `gradle-wrapper.properties`)
+4. Rouvrir le projet et Sync

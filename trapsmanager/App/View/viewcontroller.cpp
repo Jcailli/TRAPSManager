@@ -629,6 +629,11 @@ int ViewController::deviceConnectionPort() const {
 }
 
 void ViewController::setDeviceConnectionPort(int port) {
+    // 8080 = port données (pénalités/chronos) — interdit pour la supervision appareils
+    if (port < 1024 || port > 65535 || port == 8080) {
+        qWarning() << "Invalid device connection port" << port << "(1024-65535, 8080 forbidden)";
+        return;
+    }
     if (_deviceConnectionPort != port) {
         _deviceConnectionPort = port;
 
@@ -637,7 +642,7 @@ void ViewController::setDeviceConnectionPort(int port) {
 
         _deviceConnectionServer->stopServer();
         if (_deviceConnectionServer->startServer(_deviceConnectionPort)) {
-            qDebug() << "Device connection server restarted on port" << _deviceConnectionPort;
+            qInfo() << "Device connection server restarted on port" << _deviceConnectionPort;
             refreshStatusText();
         } else {
             qWarning() << "Failed to restart device connection server on port" << _deviceConnectionPort;

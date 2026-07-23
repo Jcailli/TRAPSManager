@@ -372,7 +372,7 @@ Rectangle {
             spacing: 10
             width: parent.width
             Text {
-                text: "Port TCP (1024–65535)"
+                text: "Port TCP (1024–65535, 8080 interdit)"
                 font.pixelSize: fontSize * 0.8
             }
             TextField {
@@ -383,18 +383,38 @@ Rectangle {
                 inputMethodHints: Qt.ImhDigitsOnly
             }
             Text {
-                text: "Le serveur redémarre après validation. Mettez à jour Traps App si besoin."
+                text: "Le serveur redémarre après validation. Mettez à jour Traps App si besoin.\nLe port 8080 est réservé aux données (pénalités/chronos)."
                 wrapMode: Text.Wrap
                 width: parent.width
                 font.pixelSize: fontSize * 0.65
                 color: "#666"
             }
+            Text {
+                id: portError
+                width: parent.width
+                wrapMode: Text.Wrap
+                visible: text.length > 0
+                color: "#C62828"
+                font.pixelSize: fontSize * 0.7
+            }
         }
+
+        onOpened: portError.text = ""
 
         onAccepted: {
             var p = parseInt(portField.text)
-            if (p >= 1024 && p <= 65535)
-                viewcontroller.setDeviceConnectionPort(p)
+            if (p === 8080) {
+                portError.text = "Le port 8080 est interdit (réservé aux données)."
+                portDialog.open()
+                return
+            }
+            if (p < 1024 || p > 65535 || isNaN(p)) {
+                portError.text = "Port invalide (1024–65535)."
+                portDialog.open()
+                return
+            }
+            portError.text = ""
+            viewcontroller.setDeviceConnectionPort(p)
         }
     }
 }

@@ -76,22 +76,30 @@ Aligner TRAPS-CK sur TRAPSManager moderne :
 | Canal | Port | Rôle |
 |-------|------|------|
 | UDP Hello | 5432 | Découverte IP + port **données** |
-| TCP supervision | **8081** | `register` / `heartbeat` / `loadBibList` / **sync temps** |
+| TCP supervision | **configurable** (défaut **8081**, **8080 interdit**) | `register` / `heartbeat` / `loadBibList` / **sync temps** |
 | TCP données | ~8080 | Pénalités + chronos (protocole JSON actuel) |
 
 ```
 TRAPS-CK ──UDP──► Hello
-TRAPS-CK ──TCP 8081──► register + heartbeat + loadBibList + syncTime
+TRAPS-CK ──TCP port appareils──► register + heartbeat + loadBibList + syncTime
+          (défaut 8081, ≠ 8080)
 TRAPS-CK ──TCP données──► penalty / start / finish
 ```
 
-**Convention initiale** : port appareils **8081 fixe** (comme Manager).  
+**Convention** : port appareils **configurable** des deux côtés (défaut 8081).  
+**8080 interdit** (réservé au canal données pénalités/chronos).  
 Évolution possible : 5ᵉ champ Hello `portAppareils` (changement Manager + compat).
 
 ### Identifiant appareil (MAC)
-Sur Android récent, la MAC Wi‑Fi réelle est souvent inaccessible.  
-Afficher la meilleure MAC possible ; sinon **IP** + identifiant secondaire (`ANDROID_ID`).  
-Allowlist Manager : **MAC et/ou IP** (déjà prévu).
+Sur Android récent, la MAC Wi‑Fi réelle est souvent inaccessible (`02:00:00:00:00:00`).
+- On ne considère une MAC **fiable** que si elle vient de l’interface qui porte l’IP Wi‑Fi.
+- Sinon affichage **« Non disponible »** ; allowlist via **IP** ; champ `mac` vide au `register`.
+- Allowlist Manager : **MAC et/ou IP** (déjà prévu).
+
+### Messages d’erreur TCP appareils
+Si connexion échoue : message avec `host:port`, type d’erreur (timeout / refusée / injoignable)
+et rappel **pare-feu Windows** (autoriser le port TCP choisi).
+Port saisi côté app : même valeur que dans le Manager ; **8080 refusé**.
 
 ---
 
@@ -129,11 +137,15 @@ Le **mode choisi sur le téléphone** doit rester cohérent avec le mode configu
 ## 8. Phases de réalisation
 
 ### Phase A — Socle connexion & entrée
-- [ ] Écran MAC + Connexion (`register` / `rejected`)
-- [ ] Heartbeat 8081
-- [ ] Écran choix mode (3 boutons)
-- [ ] Version app **4.0**
-- [ ] Documenter limite MAC Android
+- [x] Écran IP (prioritaire) + port configurable + MAC + Connexion (`register` / `rejected`)
+- [x] Heartbeat TCP appareils (défaut 8081)
+- [x] Écran choix mode (3 boutons)
+- [x] Version app **4.0**
+- [x] MAC fiable uniquement via interface de l’IP Wi‑Fi ; sinon « Non disponible »
+- [x] Messages d’erreur TCP avec hint pare-feu + cible host:port
+- [x] Port appareils configurable (défaut 8081, **8080 interdit**) — aligné Manager
+- [x] Documenter limite MAC Android (hint UI si MAC non fiable)
+- [x] Pont temporaire vers `BiblistActivity` après choix du mode (remplacé en Phase B)
 
 ### Phase B — Liste dossards & navigation
 - [ ] Réception / application `loadBibList` depuis Manager
@@ -177,7 +189,7 @@ Le **mode choisi sur le téléphone** doit rester cohérent avec le mode configu
 
 ## 10. Décisions ouvertes
 
-- [ ] Hello étendu vs 8081 fixe
+- [ ] Hello étendu (annonce port appareils) vs saisie manuelle actuelle
 - [ ] Format exact `syncTime` (broadcast, RTT, précision)
 - [ ] Faut-il pousser `competitionMode` / `gateCount` depuis le Manager ? (config portes reste locale pour l’instant)
 - [ ] Conservatisme SMS / CompetFFCK en mode dégradé sans Manager

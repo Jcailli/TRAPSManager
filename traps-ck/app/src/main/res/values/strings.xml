@@ -82,4 +82,29 @@
     <string name="hello_world">Hello world!</string>
     <string name="title_activity_chrono_config">ChronoConfigActivity</string>
 
+    <!-- Phase A — Connexion Manager -->
+    <string name="connect_title">TRAPS-CK 4.0</string>
+    <string name="connect_subtitle">Connexion à TRAPSManager</string>
+    <string name="connect_ip_label">Adresse IP Wi‑Fi (liste blanche Manager)</string>
+    <string name="connect_mac_label">Adresse MAC</string>
+    <string name="connect_mac_unavailable">Non disponible</string>
+    <string name="connect_ip_unknown">—</string>
+    <string name="connect_mac_unreliable_hint">Android ne fournit plus la vraie MAC Wi‑Fi. Ajoutez l\'IP ci-dessus dans la liste blanche du Manager.</string>
+    <string name="connect_port_label">Port Manager (appareils)</string>
+    <string name="connect_port_hint">Par défaut 8081 — même valeur que dans TRAPSManager</string>
+    <string name="connect_target_format">Cible : %1$s:%2$d</string>
+    <string name="connect_button">Connexion</string>
+    <string name="connect_in_progress">Connexion en cours…</string>
+    <string name="connect_not_authorized">Connexion au manager non autorisée</string>
+    <string name="connect_manager_not_found">TRAPSManager introuvable (UDP Hello). Vérifiez le Wi‑Fi et que le Manager est démarré.</string>
+    <string name="connect_port_invalid">Port invalide (1024–65535, 8080 interdit — réservé aux données).</string>
+    <string name="connect_port_forbidden_8080">Le port 8080 est réservé aux pénalités/chronos. Choisissez un autre port (ex. 8081).</string>
+    <string name="connect_disconnected">Connexion au Manager perdue</string>
+
+    <string name="mode_select_title">Mode de compétition</string>
+    <string name="mode_select_subtitle">Choisissez le mode de gestion</string>
+    <string name="mode_individual">Individuel</string>
+    <string name="mode_patrol">Patrouille</string>
+    <string name="mode_kcross">KCross (Trial)</string>
+
 </resources>

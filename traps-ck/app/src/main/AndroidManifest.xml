@@ -9,6 +9,7 @@
     <permission android:name="com.traps.trapsapp.permission.RECEIVE_SENDTO" />
 
     <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <uses-permission android:name="android.permission.READ_PHONE_STATE" />
     <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
     <uses-permission android:name="android.permission.CHANGE_WIFI_STATE" />
@@ -23,47 +24,50 @@
         android:supportsRtl="true"
         android:theme="@style/AppTheme">
 
-        <activity android:name=".BiblistActivity"
+        <activity
+            android:name=".ConnectActivity"
             android:exported="true"
+            android:label="@string/connect_title"
             tools:ignore="ExtraText">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
-
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+
+        <activity
+            android:name=".ModeSelectActivity"
+            android:exported="false"
+            android:label="@string/mode_select_title" />
+
+        <activity
+            android:name=".BiblistActivity"
+            android:exported="false"
+            tools:ignore="ExtraText" />
+
         <activity
             android:name="com.traps.trapsapp.PenaltyActivity"
             android:configChanges="orientation"
-            android:label="@string/TerminalActivity_title" >
-        </activity>
+            android:label="@string/TerminalActivity_title" />
         <activity
             android:name="com.traps.trapsapp.SenderListActivity"
             android:label="@string/SenderListActivity_title"
-            android:windowSoftInputMode="stateHidden|adjustResize" >
-        </activity>
+            android:windowSoftInputMode="stateHidden|adjustResize" />
         <activity
             android:name="com.traps.trapsapp.FFCanoeConnectActivity"
             android:label="@string/FFCanoeConnectActivity_title"
-            android:windowSoftInputMode="stateHidden|adjustResize" >
-        </activity>
+            android:windowSoftInputMode="stateHidden|adjustResize" />
         <activity
             android:name="com.traps.trapsapp.CompetFFCKConnectActivity"
             android:label="Connexion CompetFFCK"
-            android:windowSoftInputMode="stateHidden|adjustResize" >
-        </activity>
-
+            android:windowSoftInputMode="stateHidden|adjustResize" />
         <activity
             android:name="com.traps.trapsapp.TerminalConfigActivity"
             android:label="@string/title_transfer_activity"
-            android:windowSoftInputMode="stateHidden|adjustResize" >
-        </activity>
+            android:windowSoftInputMode="stateHidden|adjustResize" />
         <activity
             android:name="com.traps.trapsapp.ChronoActivity"
-            android:label="@string/title_activity_chrono" >
-        </activity>
-
-
+            android:label="@string/title_activity_chrono" />
 
     </application>
 </manifest>
