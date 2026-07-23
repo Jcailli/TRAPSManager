@@ -8,6 +8,8 @@ Drawer {
     width: 250
     height: 600
 
+    signal openDeviceManagerRequested
+
     ListView {
         id: drawerListView
         anchors.fill: parent
@@ -16,6 +18,7 @@ Drawer {
         model: ListModel {
             ListElement { functionName: "Charger liste de dossards avec fichier PCE\n(export CompetFFCK)"; funtionId: 0 }
             ListElement { functionName: "Charger liste de dossards avec fichier CSV\n(manuel ou export Excel)"; functionId: 1 }
+            ListElement { functionName: "Gestion des appareils"; functionId: 13 }
             ListElement { functionName: "Effacer pénalités"; functionId: 8 }
             ListElement { functionName: "Effacer chronos"; functionId: 9 }
             ListElement { functionName: "Configurer nombre de portes"; functionId: 10 }
@@ -89,8 +92,11 @@ Drawer {
                         viewcontroller.configureCompetitionMode();
                         break;
                     }
-
-
+                    case 13: {
+                        drawer.close();
+                        drawer.openDeviceManagerRequested();
+                        break;
+                    }
 
                 }
             }

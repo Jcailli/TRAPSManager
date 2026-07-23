@@ -47,10 +47,13 @@ ViewController::ViewController(const QStringList& hostList, int requestedTcpPort
         qDebug() << "Device connection server started on port" << _deviceConnectionPort;
     } else {
         qWarning() << "Failed to start device connection server";
+        showToast(QString("Serveur appareils : échec d'écoute sur le port %1").arg(_deviceConnectionPort), 5000);
     }
 
     connect(_deviceConnectionServer, &DeviceConnectionServer::toast,
             this, &ViewController::toast);
+    connect(_deviceConnectionServer, &DeviceConnectionServer::listeningChanged,
+            this, &ViewController::deviceServerListeningChanged);
 }
 
 void ViewController::setBibCount(int bibCount) {
@@ -628,10 +631,29 @@ int ViewController::deviceConnectionPort() const {
     return _deviceConnectionPort;
 }
 
+bool ViewController::deviceServerListening() const {
+    return _deviceConnectionServer && _deviceConnectionServer->isListening();
+}
+
+void ViewController::restartDeviceConnectionServer() {
+    if (!_deviceConnectionServer)
+        return;
+    _deviceConnectionServer->stopServer();
+    if (_deviceConnectionServer->startServer(_deviceConnectionPort)) {
+        qInfo() << "Device connection server restarted on port" << _deviceConnectionPort;
+        showToast(QString("Serveur appareils en écoute sur le port %1").arg(_deviceConnectionPort), 3000);
+        refreshStatusText();
+    } else {
+        qWarning() << "Failed to restart device connection server on port" << _deviceConnectionPort;
+        showToast(QString("Échec : port %1 indisponible (déjà utilisé ?)").arg(_deviceConnectionPort), 5000);
+    }
+}
+
 void ViewController::setDeviceConnectionPort(int port) {
     // 8080 = port données (pénalités/chronos) — interdit pour la supervision appareils
     if (port < 1024 || port > 65535 || port == 8080) {
         qWarning() << "Invalid device connection port" << port << "(1024-65535, 8080 forbidden)";
+        showToast("Port invalide (1024–65535, 8080 interdit)", 4000);
         return;
     }
     if (_deviceConnectionPort != port) {
@@ -640,15 +662,8 @@ void ViewController::setDeviceConnectionPort(int port) {
         QSettings settings;
         settings.setValue("deviceConnectionPort", _deviceConnectionPort);
 
-        _deviceConnectionServer->stopServer();
-        if (_deviceConnectionServer->startServer(_deviceConnectionPort)) {
-            qInfo() << "Device connection server restarted on port" << _deviceConnectionPort;
-            refreshStatusText();
-        } else {
-            qWarning() << "Failed to restart device connection server on port" << _deviceConnectionPort;
-        }
-
         emit deviceConnectionPortChanged(_deviceConnectionPort);
+        restartDeviceConnectionServer();
     }
 }
 

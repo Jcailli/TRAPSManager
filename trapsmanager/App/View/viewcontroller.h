@@ -23,6 +23,7 @@ class ViewController : public QObject
     Q_PROPERTY(QStringList kayakCrossPostTypes READ kayakCrossPostTypes NOTIFY kayakCrossPostTypesChanged)
     Q_PROPERTY(DeviceConnectionServer* deviceConnectionServer READ deviceConnectionServer CONSTANT)
     Q_PROPERTY(int deviceConnectionPort READ deviceConnectionPort NOTIFY deviceConnectionPortChanged)
+    Q_PROPERTY(bool deviceServerListening READ deviceServerListening NOTIFY deviceServerListeningChanged)
 
 
 public:
@@ -42,6 +43,8 @@ public:
     QStringList kayakCrossPostTypes() const { return _kayakCrossPostTypes; }
     Q_INVOKABLE void broadcastBibListToDevices();
     Q_INVOKABLE void sendBibListToDevice(const QString &deviceId);
+    Q_INVOKABLE void restartDeviceConnectionServer();
+    bool deviceServerListening() const;
 
 signals:
 
@@ -65,6 +68,7 @@ signals:
     void kayakCrossPostCountChanged(int postCount);
     void kayakCrossPostTypesChanged(QStringList postTypes);
     void deviceConnectionPortChanged(int port);
+    void deviceServerListeningChanged();
     void watchdog();
     void openSoftwareUpdate();
     void checknewVersion(bool force);

@@ -50,6 +50,18 @@ ApplicationWindow {
             anchors.left: watchdog.right
             anchors.verticalCenter: parent.verticalCenter
             anchors.leftMargin: 20
+            anchors.right: devicesButton.left
+            anchors.rightMargin: 12
+            elide: Text.ElideRight
+        }
+
+        ToolButton {
+            id: devicesButton
+            text: "Appareils"
+            anchors.right: toolButton.left
+            anchors.verticalCenter: parent.verticalCenter
+            font.pixelSize: viewcontroller.fontSize * 0.85
+            onClicked: appWindow.openDeviceManager()
         }
 
         ToolButton {
@@ -65,12 +77,38 @@ ApplicationWindow {
 
     }
 
+    // Fenêtre appareils créée hors de ApplicationWindow (indépendante)
+    property var deviceManagerWindow: null
+
+    Component {
+        id: deviceManagerWindowComponent
+        DeviceManagerWindow { }
+    }
+
+    function openDeviceManager() {
+        if (!deviceManagerWindow) {
+            deviceManagerWindow = deviceManagerWindowComponent.createObject(null)
+            if (!deviceManagerWindow) {
+                console.warn("Impossible de créer la fenêtre Appareils")
+                return
+            }
+        }
+        deviceManagerWindow.openWindow()
+    }
+
+    onClosing: {
+        if (deviceManagerWindow) {
+            deviceManagerWindow.destroy()
+            deviceManagerWindow = null
+        }
+    }
+
     TRAPSDrawer {
         id: drawer
         edge: Qt.RightEdge
         width: viewcontroller.fontSize * 17
         height: parent.height
-
+        onOpenDeviceManagerRequested: appWindow.openDeviceManager()
     }
 
     App {

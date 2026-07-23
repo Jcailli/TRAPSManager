@@ -26,6 +26,8 @@
 #include <QStandardPaths>
 #include <QJsonArray>
 #include "DeviceManager/deviceconnectionserver.h"
+#include "DeviceManager/deviceallowlist.h"
+#include <QtQml>
 
 // Controller for static files
 stefanfrings::StaticFileController* staticFileController;
@@ -78,6 +80,13 @@ int main(int argc, char *argv[]) {
     qRegisterMetaType< QList<Penalty> >("QList<Penalty>");
     qRegisterMetaType< QList<int> >("QList<int>");
     qRegisterMetaType< QHash<int,int> >("QHash<int,int>");
+
+    qmlRegisterUncreatableType<DeviceConnectionServer>(
+                "TRAPS", 1, 0, "DeviceConnectionServer",
+                QStringLiteral("DeviceConnectionServer is provided by viewcontroller"));
+    qmlRegisterUncreatableType<DeviceAllowlist>(
+                "TRAPS", 1, 0, "DeviceAllowlist",
+                QStringLiteral("DeviceAllowlist is provided by the device server"));
 
     Global::init();
     QSettings customSettings(QString("%0/traps.ini").arg(Global::appDataDir), QSettings::IniFormat);

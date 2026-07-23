@@ -38,5 +38,6 @@
         <file>qml/Popup.qml</file>
         <file>qml/KayakCrossPostConfig.qml</file>
         <file>qml/DeviceManagerPanel.qml</file>
+        <file>qml/DeviceManagerWindow.qml</file>
     </qresource>
 </RCC>

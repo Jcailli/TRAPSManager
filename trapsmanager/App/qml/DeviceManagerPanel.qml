@@ -38,7 +38,7 @@ Rectangle {
                     spacing: 12
 
                     Column {
-                        width: parent.width - 160
+                        width: parent.width - 280
                         spacing: 4
                         Text {
                             text: "Appareils Traps App"
@@ -47,13 +47,13 @@ Rectangle {
                             color: "#1565C0"
                         }
                         Text {
-                            text: (server && server.listening)
+                            text: viewcontroller.deviceServerListening
                                   ? ("En écoute sur le port " + viewcontroller.deviceConnectionPort
-                                     + " — " + (server.connectedDeviceCount || 0) + " connecté(s), "
-                                     + (server.activeDeviceCount || 0) + " actif(s)")
-                                  : "Serveur arrêté"
+                                     + " — " + ((server && server.connectedDeviceCount) || 0) + " connecté(s), "
+                                     + ((server && server.activeDeviceCount) || 0) + " actif(s)")
+                                  : ("Serveur arrêté (port " + viewcontroller.deviceConnectionPort + ")")
                             font.pixelSize: fontSize * 0.7
-                            color: "#555"
+                            color: viewcontroller.deviceServerListening ? "#555" : "#C62828"
                             wrapMode: Text.Wrap
                             width: parent.width
                         }
@@ -61,10 +61,18 @@ Rectangle {
 
                     Button {
                         text: "Port…"
-                        width: 140
+                        width: 100
                         height: 36
                         anchors.verticalCenter: parent.verticalCenter
                         onClicked: portDialog.open()
+                    }
+
+                    Button {
+                        text: viewcontroller.deviceServerListening ? "Redémarrer" : "Démarrer"
+                        width: 120
+                        height: 36
+                        anchors.verticalCenter: parent.verticalCenter
+                        onClicked: viewcontroller.restartDeviceConnectionServer()
                     }
                 }
             }
