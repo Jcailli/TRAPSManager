@@ -9,6 +9,7 @@
 //#include "httplistener.h"
 //#include "HTTPServer/requestmapper.h"
 #include "global.h"
+#include "version.h"
 #include "Update/softwareupdate.h"
 #include "Network/hellobroadcaster.h"
 #include "Canoe/penalty.h"
@@ -67,8 +68,10 @@ int main(int argc, char *argv[]) {
     QGuiApplication::setOrganizationName("TRAPS");
     QGuiApplication::setOrganizationDomain("traps-ck.com");
     QGuiApplication::setApplicationName("TRAPSManager4");
+    QGuiApplication::setApplicationVersion(QStringLiteral(TRAPS_MANAGER_VERSION));
 
     qInfo() << "Platform name: " << QGuiApplication::platformName();
+    qInfo() << "TRAPSManager version:" << TRAPS_MANAGER_VERSION;
 
     qInstallMessageHandler(messageHandler);
     // the following data structures can be transported with signal / slot
@@ -117,6 +120,9 @@ int main(int argc, char *argv[]) {
     SoftwareUpdate softwareUpdate(QGuiApplication::platformName(), QStandardPaths::writableLocation(QStandardPaths::DownloadLocation));
     ViewController viewController(hostList, tcpPort);
 
+    // Nombre de portes depuis CompetFFCK (commande list / gates N)
+    QObject::connect(&competFFCK, &CompetFFCK::gateCountReceived, &viewController, &ViewController::setGateCount);
+
     // ViewController - softwareUpdater
     QObject::connect(&viewController, &ViewController::checknewVersion, &softwareUpdate, &SoftwareUpdate::checknewVersion);
     QObject::connect(&softwareUpdate, &SoftwareUpdate::triggerOpenSoftwareUpdate, &viewController, &ViewController::openSoftwareUpdate);
@@ -131,15 +137,15 @@ int main(int argc, char *argv[]) {
     QObject::connect(&viewController, &ViewController::requestPenaltyClear, &bibList, &BibList::clearPenalties);
     QObject::connect(&viewController, &ViewController::requestChronoClear, &bibList, &BibList::clearChronos);
     QObject::connect(&viewController, &ViewController::requestExportAllData, &bibList, &BibList::exportAllData);
+    QObject::connect(&viewController, &ViewController::gateCountChanged, &bibList, &BibList::setGateCount);
+    QObject::connect(&viewController, &ViewController::competitionModeChanged, &bibList, &BibList::setCompetitionMode);
+    QObject::connect(&viewController, &ViewController::kayakCrossPostCountChanged, &bibList, &BibList::setKayakCrossPostCount);
 
-    // ViewController - TCPServer (DÉSACTIVÉ - Utilise le nouveau DeviceConnectionServer)
-    // QObject::connect(&viewController, &ViewController::requestTcpServer, &tcpServer, &TCPServer::start);
-
-    // TCPServer - Viewcontroller (DÉSACTIVÉ - Utilise le nouveau DeviceConnectionServer)
-    // QObject::connect(&tcpServer, &TCPServer::serverStarted, &viewController, &ViewController::setTcpPort);
-    // QObject::connect(&tcpServer, &TCPServer::serverStarted, &hello, &HelloBroadcaster::setTcpPort);
-
-    // QObject::connect(&tcpServer, &TCPServer::startFailure, &viewController, &ViewController::tcpServerStarFailure);
+    // TCPServer legacy (command:0 = liste dossards pour ancienne Traps App)
+    QObject::connect(&viewController, &ViewController::requestTcpServer, &tcpServer, &TCPServer::start);
+    QObject::connect(&tcpServer, &TCPServer::serverStarted, &viewController, &ViewController::setTcpPort);
+    QObject::connect(&tcpServer, &TCPServer::serverStarted, &hello, &HelloBroadcaster::setTcpPort);
+    QObject::connect(&tcpServer, &TCPServer::startFailure, &viewController, &ViewController::tcpServerStarFailure);
 
     // BibList - ViewController
     QObject::connect(&bibList, &BibList::bibCountChanged, &viewController, &ViewController::setBibCount);
@@ -151,11 +157,10 @@ int main(int argc, char *argv[]) {
     QObject::connect(&competFFCK, &CompetFFCK::toast, &viewController, &ViewController::toast);
     QObject::connect(&competFFCK, &CompetFFCK::error, &viewController, &ViewController::printError);
 
-    // Hello broadcaster - ViewController
+    // Hello UDP annonce le port données (compat ancienne app), pas le 8081
     QObject::connect(&hello, &HelloBroadcaster::broadcastError, &viewController, &ViewController::broadcastError);
     QObject::connect(&hello, &HelloBroadcaster::sayHello, &viewController, &ViewController::watchdog);
     QObject::connect(&viewController, &ViewController::selectedAddress, &hello, &HelloBroadcaster::setAddress);
-    QObject::connect(&viewController, &ViewController::deviceConnectionPortChanged, &hello, &HelloBroadcaster::setTcpPort);
 
     // Envoi de la liste de dossards vers les appareils autorisés/connectés
     QObject::connect(&viewController, &ViewController::requestBroadcastBibList,

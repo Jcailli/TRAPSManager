@@ -41,6 +41,7 @@ signals:
     void sendTimeToServer(int bib, int time);
     void requestBibListFromServer();
     void bibListReceived(QJsonArray bibs);
+    void gateCountReceived(int gateCount);
     void error(QString title, QString message);
     void toast(QString message, int delay);
     void bufferChanged(int);
@@ -59,6 +60,7 @@ public slots:
     void penaltySent();
     void requestBibList();
     void onBibListReceived(const QJsonArray &bibs);
+    void onGateCountReceived(int gateCount);
 
     void sendPenalty(int bib, int gateId, int penalty);
     void sendTime(int bib, int time);

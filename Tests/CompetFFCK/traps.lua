@@ -386,13 +386,19 @@ function SendBibList()
 		return
 	end
 
+	-- Nb_porte = nombre de portes de la fenetre gestion de course
+	local nbPortes = tonumber(raceInfo.Nb_porte) or 0;
+	if nbPortes > 0 then
+		writeLine("gates "..tostring(nbPortes));
+	end
+
 	for i = 1, #rows do
 		local r = rows[i];
 		writeLine("bib "..tostring(r.bib).." "..r.categ.." "..r.schedule);
 	end
 
 	writeLine("list_end "..tostring(#rows));
-	Alert("TRAPS: list envoyee ("..tostring(#rows).." dossards via "..source..")");
+	Alert("TRAPS: list envoyee ("..tostring(#rows).." dossards via "..source..", portes="..tostring(nbPortes)..")");
 end
 
 

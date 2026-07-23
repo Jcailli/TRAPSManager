@@ -72,6 +72,9 @@ public slots:
 
     void selectPenalty(int bibIndex, int gateIndex);
     void setScheduling(int criteria);
+    void setGateCount(int gateCount);
+    void setCompetitionMode(int mode);
+    void setKayakCrossPostCount(int postCount);
     void lock(int firstRow, int lastRow);
     void unlock(int firstRow, int lastRow);
     void forwardBib(int firstRow, int lastRow);
@@ -94,15 +97,19 @@ private:
     Database _db;
     int _scheduling;
     int _gateCount;
+    int _competitionMode; // 0 = Individuel, 1 = Patrouille, 2 = Kayak Cross
+    int _kayakCrossPostCount;
 
     void rebuildPenaltyList();
+    int penaltyColumnCount() const;
+    int penaltyModelIndex(int bibRow, int gateId) const;
+    QStringList penaltyRowStrings(const Bib* bib) const;
 
     static bool numberLessThan(Bib* bib1, Bib* bib2);
     static bool entryLessThan(Bib* bib1, Bib* bib2);
     static bool scheduleLessThan(Bib* bib1, Bib* bib2);
 
     void reloadFromDataBase();
-    void setGateCount(int gateCount);
     void orderBibList();
     
 

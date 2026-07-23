@@ -32,16 +32,17 @@ QString localFilePath(const QString& filename) {
 BibList::BibList() : QAbstractListModel(),
     _db("traps.db", QStringList() << DB_BIB << DB_LOCKS << DB_TIMES << DB_PENALTIES),
     _scheduling(0),
-    _gateCount(25)
-
+    _gateCount(25),
+    _competitionMode(0),
+    _kayakCrossPostCount(5)
 {
     QQmlEngine::setObjectOwnership(this, QQmlEngine::CppOwnership);
     QSettings settings;
     _scheduling = settings.value("scheduling").toInt();
     _gateCount = settings.value("gateCount", QVariant(25)).toInt();
+    _competitionMode = settings.value("competitionMode", QVariant(0)).toInt();
+    _kayakCrossPostCount = settings.value("kayakCrossPostCount", QVariant(5)).toInt();
     Bib::setGateCount(_gateCount);
-    
- // Initialiser Bib avec le nombre de portes
 
     reloadFromDataBase();
 }
@@ -54,15 +55,85 @@ void BibList::setGateCount(int gateCount) {
     // Validation selon le règlement : entre 18 et 25 portes
     if (gateCount < 18) gateCount = 18;
     if (gateCount > 25) gateCount = 25;
-    
+
     if (_gateCount != gateCount) {
         _gateCount = gateCount;
-        Bib::setGateCount(_gateCount); // Synchroniser avec Bib
+        Bib::setGateCount(_gateCount);
         QSettings settings;
         settings.setValue("gateCount", _gateCount);
         emit gateCountChanged(_gateCount);
         qDebug() << "BibList gate count changed to:" << _gateCount;
+        rebuildPenaltyList();
     }
+}
+
+void BibList::setCompetitionMode(int mode) {
+    if (mode < 0) mode = 0;
+    if (mode > 2) mode = 2;
+
+    if (_competitionMode != mode) {
+        _competitionMode = mode;
+        qDebug() << "BibList competition mode changed to:" << _competitionMode;
+        rebuildPenaltyList();
+    }
+}
+
+void BibList::setKayakCrossPostCount(int postCount) {
+    if (postCount < 1) postCount = 1;
+    if (postCount > 9) postCount = 9;
+
+    if (_kayakCrossPostCount != postCount) {
+        _kayakCrossPostCount = postCount;
+        qDebug() << "BibList kayak cross post count changed to:" << _kayakCrossPostCount;
+        rebuildPenaltyList();
+    }
+}
+
+int BibList::penaltyColumnCount() const {
+    switch (_competitionMode) {
+        case 1: return _gateCount * 3;                 // Patrouille : A/B/C par porte
+        case 2: return _kayakCrossPostCount + 2;       // Kayak Cross : D + postes + A
+        default: return _gateCount;                    // Individuel
+    }
+}
+
+int BibList::penaltyModelIndex(int bibRow, int gateId) const {
+    int col;
+    if (_competitionMode == 1)
+        col = (gateId - 1) * 3; // Colonne A de la porte
+    else if (_competitionMode == 2)
+        col = gateId; // 0 = Départ, postes à partir de 1
+    else
+        col = gateId - 1;
+
+    if (col < 0)
+        col = 0;
+    const int cols = penaltyColumnCount();
+    if (col >= cols)
+        col = cols - 1;
+    return bibRow * cols + col;
+}
+
+QStringList BibList::penaltyRowStrings(const Bib* bib) const {
+    QStringList list;
+    if (!bib)
+        return list;
+
+    if (_competitionMode == 1) {
+        for (int gateId = 1; gateId <= _gateCount; gateId++) {
+            list << bib->penaltyAtGate(gateId).toString();
+            list << QString(); // B
+            list << QString(); // C
+        }
+    } else if (_competitionMode == 2) {
+        list << QString(); // Départ
+        for (int i = 1; i <= _kayakCrossPostCount; i++)
+            list << bib->penaltyAtGate(i).toString();
+        list << QString(); // Arrivée
+    } else {
+        list << bib->penaltyStringList();
+    }
+    return list;
 }
 
 Bib *BibList::bibAtIndex(int index) const {
@@ -367,13 +438,14 @@ void BibList::processIncomingPenalty(int bibnumber, QHash<int, int> penaltyList)
         return;
     }
     int bibRow = bibIndex(bibnumber);
+    const int cols = penaltyColumnCount();
     foreach (int gateId, penaltyList.keys()) {
         int penaltyValue = penaltyList.value(gateId);
         Penalty penalty(bib->id(), gateId, penaltyValue);
         if (bib->setPenalty(penalty)) {
             qDebug() << "Biblist emiting send penalty for gate " << gateId;
             emit penaltyReceived(bibnumber, gateId, penaltyValue);
-            int changedIndex = bibRow*_gateCount+gateId-1;
+            int changedIndex = penaltyModelIndex(bibRow, gateId);
             qDebug() << "Changing penalty at index " << changedIndex;
             _penaltyListModel.setPenalty(changedIndex, QString::number(penaltyValue));
         }
@@ -384,8 +456,8 @@ void BibList::processIncomingPenalty(int bibnumber, QHash<int, int> penaltyList)
     }
     _db.setValue(DB_PENALTIES, bib->id(), bib->jsonPenalty());
     // Notify penalties for this bib has changed
-    int firstIndex = bibRow*_gateCount;
-    int lastIndex = (bibRow+1)*_gateCount-1;
+    int firstIndex = bibRow * cols;
+    int lastIndex = (bibRow + 1) * cols - 1;
     qDebug() << "Data changed from " << firstIndex << " to " << lastIndex;
     emit _penaltyListModel.refresh(firstIndex, lastIndex);
 }
@@ -536,9 +608,11 @@ void BibList::rebuildPenaltyList() {
 
     QStringList stringList;
     foreach (Bib* bib, _bibList) {
-        stringList << bib->penaltyStringList();
+        stringList << penaltyRowStrings(bib);
     }
     _penaltyListModel.reset(stringList);
+    qDebug() << "Penalty list rebuilt:" << _bibList.count() << "bibs x"
+             << penaltyColumnCount() << "columns =" << stringList.count() << "cells";
 
 }
 

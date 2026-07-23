@@ -286,12 +286,10 @@ void ViewController::setTcpPort(int tcpPort) {
 void ViewController::viewReady() {
     if (_hostList.count()==1) {  // only one network on this machine
         _selectedHost = _hostList.value(0);
-        qDebug() << "Selected network:" << _selectedHost
+        qDebug() << "Requesting TCP server on:" << _selectedHost << ":" << _requestedTcpPort
                  << "- device server port:" << _deviceConnectionPort;
-        _runningTcpPort = _deviceConnectionPort;
-        refreshStatusText();
         emit selectedAddress(_selectedHost);
-        emit deviceConnectionPortChanged(_deviceConnectionPort);
+        emit requestTcpServer(_selectedHost, _requestedTcpPort);
     }
     else if (_hostList.count()==0) {
         qDebug() << "No network, Abort";
@@ -316,12 +314,11 @@ void ViewController::viewReady() {
         dialogBox->onButtonClicked([this, dialogBox](int index) {
             dialogBox->deleteLater();
             _selectedHost = _hostList.value(index);
-            qDebug() << "Selected ip address: " << _selectedHost
-                     << "- device server port:" << _deviceConnectionPort;
-            _runningTcpPort = _deviceConnectionPort;
-            refreshStatusText();
+            qDebug() << "Selected ip address:" << _selectedHost
+                     << "- requesting TCP:" << _requestedTcpPort
+                     << "- device server:" << _deviceConnectionPort;
             emit this->selectedAddress(_selectedHost);
-            emit this->deviceConnectionPortChanged(_deviceConnectionPort);
+            emit this->requestTcpServer(_selectedHost, _requestedTcpPort);
 
         });
         openDialogBox(dialogBox);
@@ -613,8 +610,16 @@ void ViewController::tcpServerStarFailure() {
 }
 
 void ViewController::refreshStatusText() {
-    if (_hostList.count()==0) _statusText = "Aucun réseau disponible. Redémarrez l'application.";
-    else _statusText = QString("En écoute des TRAPS sur %1:%2").arg(_selectedHost).arg(_runningTcpPort);
+    if (_hostList.count()==0) {
+        _statusText = "Aucun réseau disponible. Redémarrez l'application.";
+    } else if (_runningTcpPort > 0) {
+        _statusText = QString("Données %1:%2 | Appareils :%3")
+                .arg(_selectedHost)
+                .arg(_runningTcpPort)
+                .arg(_deviceConnectionPort);
+    } else {
+        _statusText = QString("Démarrage serveur données sur %1…").arg(_selectedHost);
+    }
     emit statusTextChanged(_statusText);
 }
 

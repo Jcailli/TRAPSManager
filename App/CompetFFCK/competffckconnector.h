@@ -19,6 +19,7 @@ signals:
     void penaltySent();
     void chronoSent();
     void bibListReceived(QJsonArray bibs);
+    void gateCountReceived(int gateCount);
 
 public slots:
 

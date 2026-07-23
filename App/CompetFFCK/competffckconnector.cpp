@@ -130,6 +130,7 @@ void CompetFFCKConnector::requestBibList() {
     }
 
     QJsonArray bibs;
+    int gateCount = 0;
     QByteArray buffer;
     QElapsedTimer timer;
     timer.start();
@@ -162,7 +163,10 @@ void CompetFFCKConnector::requestBibList() {
                 if (parts.isEmpty()) continue;
 
                 if (parts[0] == "list_end") {
-                    qDebug() << "CompetFFCK bib list received:" << bibs.size();
+                    qDebug() << "CompetFFCK bib list received:" << bibs.size()
+                             << "gates:" << gateCount;
+                    if (gateCount > 0)
+                        emit gateCountReceived(gateCount);
                     emit bibListReceived(bibs);
                     return;
                 }
@@ -171,6 +175,13 @@ void CompetFFCKConnector::requestBibList() {
                     emit error("Chargement dossards CompetFFCK",
                                QString("CompetFFCK n'a pas pu fournir la liste:\n%0").arg(detail));
                     return;
+                }
+                if (parts[0] == "gates" && parts.size() >= 2) {
+                    bool ok = false;
+                    int n = parts[1].toInt(&ok);
+                    if (ok && n > 0)
+                        gateCount = n;
+                    continue;
                 }
                 if (parts[0] == "bib" && parts.size() >= 2) {
                     bool ok = false;

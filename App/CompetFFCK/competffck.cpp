@@ -29,6 +29,7 @@ CompetFFCK::CompetFFCK(QObject *parent) : QObject(parent),
     QObject::connect(&_connector, &CompetFFCKConnector::error, this, &CompetFFCK::error);
     QObject::connect(&_connector, &CompetFFCKConnector::penaltySent, this, &CompetFFCK::penaltySent);
     QObject::connect(&_connector, &CompetFFCKConnector::bibListReceived, this, &CompetFFCK::onBibListReceived);
+    QObject::connect(&_connector, &CompetFFCKConnector::gateCountReceived, this, &CompetFFCK::onGateCountReceived);
     QObject::connect(this, &CompetFFCK::connectToServer, &_connector, &CompetFFCKConnector::connectToServer);
     QObject::connect(this, &CompetFFCK::disconnectFromServer, &_connector, &CompetFFCKConnector::disconnectFromServer);
     QObject::connect(this, &CompetFFCK::sendPenaltyToServer, &_connector, &CompetFFCKConnector::sendPenalty);
@@ -114,6 +115,13 @@ void CompetFFCK::onBibListReceived(const QJsonArray &bibs) {
         return;
     }
     emit bibListReceived(bibs);
+}
+
+void CompetFFCK::onGateCountReceived(int gateCount) {
+    if (gateCount < 1)
+        return;
+    emit gateCountReceived(gateCount);
+    emit toast(QString("Nombre de portes récupéré depuis CompetFFCK : %0").arg(gateCount), 3000);
 }
 
 void CompetFFCK::sendPenalty(int bib, int gateId, int penalty) {
