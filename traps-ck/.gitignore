@@ -2,6 +2,15 @@
 .gradle/
 build/
 
+# Pollution si GRADLE_USER_HOME pointe par erreur vers gradle/wrapper
+gradle/wrapper/caches/
+gradle/wrapper/daemon/
+gradle/wrapper/jdks/
+gradle/wrapper/native/
+gradle/wrapper/android/
+gradle/wrapper/wrapper/
+gradle/wrapper/.tmp/
+
 # Les Clés 
 keystore.properties
 *.keystore
