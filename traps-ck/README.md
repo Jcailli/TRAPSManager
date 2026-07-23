@@ -2,17 +2,20 @@
 
 ## Description
 TRAPS App est une application Android native dédiée à la gestion des compétitions de Canoë Kayak. Cette application permet d'organiser, de gérer et de suivre les événements et les compétitions de Canoë Kayak de manière efficace et intuitive.
-Cette version prend en charge la gestion du Slalom et du KCross
+Cette version prend en charge la gestion du Slalom et du KCross.
+
+## Évolution 4.0
+Voir **[ROADMAP-4.0.md](ROADMAP-4.0.md)** : connexion garde-fou Manager, modes, liste dossards, sync base de temps. UI juges inchangée sauf **patrouille** (pénalités A/B/C, arrivée 1 + 3).
 
 ## Technologies Utilisées
 - Android SDK (API 33)
 - Java 17
-- Gradle 8.2.0 (Plugin Android 8.1.0)
+- Gradle 8.2 (Plugin Android 8.2.0)
 
 ## Versions et Compatibilité
 - Version minimum Android : API 16 (Android 4.1)
 - Version cible Android : API 33
-- Version de l'application : 2.7
+- Version de l'application : 3.1 (cible roadmap : **4.0**)
 - AndroidX AppCompat : 1.6.1
 - AndroidX ConstraintLayout : 2.1.4
 - Material Design : 1.9.0
@@ -21,7 +24,7 @@ Cette version prend en charge la gestion du Slalom et du KCross
 - Android Studio Flamingo (2022.2.1) ou plus récent
 - SDK Android (API 33)
 - Java Development Kit 17 (JDK 17)
-- Gradle 8.2.0
+- Gradle 8.2
 
 ## Installation
 [De préférence installer Docker pour compiler](https://github.com/strade03/Traps-Kayak/tree/main/Outils_Compilation)
@@ -38,4 +41,3 @@ git clone [URL_DU_REPO]
 
 3. Avec docker pour compiler :<br>
       docker run --rm  -v ./:/app android_builder gradle assembleRelease --stacktrace -x lint
-

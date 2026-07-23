@@ -28,7 +28,7 @@ Application Android native (`com.traps.trapsapp`) pour les juges / chronométreu
 traps-ck/   ← ouvrir dans Android Studio
 ```
 
-Voir `traps-ck/README.md` (build, signature, Docker).
+Voir `traps-ck/README.md` (build, signature, Docker) et **`traps-ck/ROADMAP-4.0.md`** (évolution 4.0).
 
 ## Licence
 
