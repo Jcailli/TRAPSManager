@@ -1,0 +1,961 @@
+#include "biblist.h"
+#include <QTime>
+#include <QDebug>
+#include <QQmlEngine>
+#include <QSettings>
+#include <QFile>
+#include <QTextStream>
+#include <QFileInfo>
+#include <QDir>
+#include <QUrl>
+#include <QJsonObject>
+#include <QJsonArray>
+#include <algorithm>
+#include "Database/database.h"
+
+#define DB_BIB "bibs"
+#define DB_LOCKS "locks"
+#define DB_TIMES "times"
+#define DB_PENALTIES "penalties"
+
+namespace {
+// QUrl::toLocalFile() renvoie vide sur un chemin Windows déjà local (C:\...).
+// Accepte soit une URL file://, soit un chemin natif.
+QString localFilePath(const QString& filename) {
+    if (filename.startsWith(QLatin1String("file:")))
+        return QUrl(filename).toLocalFile();
+    return filename;
+}
+}
+
+
+BibList::BibList() : QAbstractListModel(),
+    _db("traps.db", QStringList() << DB_BIB << DB_LOCKS << DB_TIMES << DB_PENALTIES),
+    _scheduling(0),
+    _gateCount(25),
+    _competitionMode(0),
+    _kayakCrossPostCount(5)
+{
+    QQmlEngine::setObjectOwnership(this, QQmlEngine::CppOwnership);
+    QSettings settings;
+    _scheduling = settings.value("scheduling").toInt();
+    _gateCount = settings.value("gateCount", QVariant(25)).toInt();
+    _competitionMode = settings.value("competitionMode", QVariant(0)).toInt();
+    _kayakCrossPostCount = settings.value("kayakCrossPostCount", QVariant(5)).toInt();
+    Bib::setGateCount(_gateCount);
+
+    reloadFromDataBase();
+}
+
+int BibList::bibCount() const {
+    return _bibList.count();
+}
+
+void BibList::setGateCount(int gateCount) {
+    // Validation selon le règlement : entre 18 et 25 portes
+    if (gateCount < 18) gateCount = 18;
+    if (gateCount > 25) gateCount = 25;
+
+    if (_gateCount != gateCount) {
+        _gateCount = gateCount;
+        Bib::setGateCount(_gateCount);
+        QSettings settings;
+        settings.setValue("gateCount", _gateCount);
+        emit gateCountChanged(_gateCount);
+        qDebug() << "BibList gate count changed to:" << _gateCount;
+        rebuildPenaltyList();
+    }
+}
+
+void BibList::setCompetitionMode(int mode) {
+    if (mode < 0) mode = 0;
+    if (mode > 2) mode = 2;
+
+    if (_competitionMode != mode) {
+        _competitionMode = mode;
+        qDebug() << "BibList competition mode changed to:" << _competitionMode;
+        rebuildPenaltyList();
+    }
+}
+
+void BibList::setKayakCrossPostCount(int postCount) {
+    if (postCount < 1) postCount = 1;
+    if (postCount > 9) postCount = 9;
+
+    if (_kayakCrossPostCount != postCount) {
+        _kayakCrossPostCount = postCount;
+        qDebug() << "BibList kayak cross post count changed to:" << _kayakCrossPostCount;
+        rebuildPenaltyList();
+    }
+}
+
+int BibList::penaltyColumnCount() const {
+    switch (_competitionMode) {
+        case 1: return _gateCount * 3;                 // Patrouille : A/B/C par porte
+        case 2: return _kayakCrossPostCount + 2;       // Kayak Cross : D + postes + A
+        default: return _gateCount;                    // Individuel
+    }
+}
+
+int BibList::penaltyModelIndex(int bibRow, int gateId) const {
+    int col;
+    if (_competitionMode == 1)
+        col = gateId - 1; // Index plat : 1=1A, 2=1B, 3=1C, 4=2A, ...
+    else if (_competitionMode == 2)
+        col = gateId; // 0 = Départ, postes à partir de 1
+    else
+        col = gateId - 1;
+
+    if (col < 0)
+        col = 0;
+    const int cols = penaltyColumnCount();
+    if (col >= cols)
+        col = cols - 1;
+    return bibRow * cols + col;
+}
+
+QStringList BibList::penaltyRowStrings(const Bib* bib) const {
+    QStringList list;
+    if (!bib)
+        return list;
+
+    if (_competitionMode == 1) {
+        // Clés téléphone / stockage = index plat 1..(gateCount*3)
+        for (int slot = 1; slot <= _gateCount * 3; slot++)
+            list << bib->penaltyAtGate(slot).toString();
+    } else if (_competitionMode == 2) {
+        list << QString(); // Départ
+        for (int i = 1; i <= _kayakCrossPostCount; i++)
+            list << bib->penaltyAtGate(i).toString();
+        list << QString(); // Arrivée
+    } else {
+        list << bib->penaltyStringList();
+    }
+    return list;
+}
+
+Bib *BibList::bibAtIndex(int index) const {
+    if (index<0 || index>=_bibList.count()) return 0;
+    return _bibList.at(index);
+}
+
+Bib *BibList::bibWithId(const QString &bibId) const {
+    foreach (Bib* bib, _bibList) {
+        if (bib->id()==bibId) return bib;
+    }
+    return 0;
+}
+
+Bib *BibList::bibWithIdNumber(int id) const {
+    foreach (Bib* bib, _bibList) {
+        if (bib->idNumber()==id) return bib;
+    }
+    return 0;
+}
+
+int BibList::bibIndex(const QString &bibId) const {
+    for (int index=0; index<_bibList.count(); index++) {
+        Bib* bib = _bibList.at(index);
+        if (bib->id()==bibId) return index;
+    }
+    return -1;
+}
+
+int BibList::bibIndex(int bibnumber) const {
+    for (int index=0; index<_bibList.count(); index++) {
+        Bib* bib = _bibList.at(index);
+        if (bib->idNumber()==bibnumber) return index;
+    }
+    return -1;
+}
+
+
+void BibList::processPCE(const QString &filename, bool reset) {
+
+    if (filename.isEmpty()) {
+        qWarning() << "No file selected. Abort.";
+        return;
+    }
+
+    QString path = localFilePath(filename);
+    qDebug() << "Loading bib list from: " << path << "(raw:" << filename << ")";
+    QFile file(path);
+    // use QFile::exists("blabla"); !
+    if (path.isEmpty() || !file.open(QFile::ReadOnly)) {
+        qDebug() << "Cannot open file " << path;
+        emit error("Chargement fichier PCE", QString("Impossible d'ouvrir le fichier\n%0").arg(path.isEmpty() ? filename : path));
+        return;
+    }
+
+    QTextStream stream(&file);
+
+    // reach boat section
+    QString string;
+
+    // first reach [resultats] section
+    while (true) {
+        string = stream.readLine().trimmed();
+        if (string.isNull() || stream.atEnd()) {
+            qDebug() << "Cannot find [resultats] section in file " << path;
+            emit error("Chargement fichier PCE", QString("Impossible de trouver la section [resultats] dans le fichier\n%0").arg(path));
+            return;
+        }
+        if (string=="[resultats]") break;
+    }
+
+    if (reset) {
+        _db.reset();
+        emit toast("Dossards actuels effacés", 3000);
+    }
+    QHash<QString,QJsonObject> bibs;
+    QHash<QString,QJsonObject> locks;
+    QHash<QString,QJsonObject> times;
+    QHash<QString,QJsonObject> penalties;
+    int row = 1;
+    emit toast("Chargement des dossards...", 3000);
+    while (true) {
+        string = stream.readLine().trimmed();
+        if (string.isNull() || stream.atEnd() || (string[0]=='[')) break;
+        if (string.isEmpty()) continue;
+        //qDebug() << string;
+        QStringList tab = string.split(';');
+        // bib number
+        if (tab.length()<11) {
+            qDebug() << "No bib number found in this line:" << string;
+            continue;
+        }
+
+        // bib number
+        bool ok;
+        int bibnumber = tab[11].toInt(&ok);
+        if (!ok || bibnumber<1) {
+            qWarning() << "Cannot convert the bib number read in this line: " << string;
+            continue;
+        }
+
+        Bib bib(bibnumber);
+        bib.setCateg(tab[3]);
+
+        //need to know how many teammate: column 12
+        int mateCount = tab[12].toInt(&ok);
+        if (!ok) mateCount=1;
+
+        if (tab.length()>28 || tab.length()>23) {
+            // schedule (index 23 if 1 guy, index 28 if 2 guys)
+            if (mateCount==1) bib.setSchedule(tab[23]);
+            else bib.setSchedule(tab[28]);
+        }
+        bib.setEntry(row);
+        bibs.insert(bib.id(), bib.jsonParam());
+        locks.insert(bib.id(), bib.jsonLock());
+        times.insert(bib.id(), bib.jsonTime());
+        penalties.insert(bib.id(), bib.jsonPenalty());
+        //qDebug() << bib.toString();
+        row++;
+    }
+    // save biblist in DB
+    if (bibs.count()>0) {
+        _db.setValueMap(DB_BIB, bibs);
+        _db.setValueMap(DB_LOCKS, locks);
+        _db.setValueMap(DB_TIMES, times);
+        _db.setValueMap(DB_PENALTIES, penalties);
+
+    }
+
+    reloadFromDataBase();
+    orderBibList();
+    emit toast(QString("Liste de %0 dossards chargée").arg(bibs.count()), 4500);
+
+}
+
+void BibList::processTXT(const QString& filename, bool reset) {
+
+    if (filename.isEmpty()) {
+        qWarning() << "No file selected. Abort.";
+        return;
+    }
+
+    QString path = localFilePath(filename);
+    qDebug() << "Loading bib list from: " << path << "(raw:" << filename << ")";
+    QFile file(path);
+    // use QFile::exists("blabla"); !
+    if (path.isEmpty() || !file.open(QFile::ReadOnly)) {
+        qDebug() << "Cannot open file " << path;
+        emit error("Chargement fichier CSV", QString("Impossible d'ouvrir le fichier\n%0").arg(path.isEmpty() ? filename : path));
+        return;
+    }
+
+    QTextStream stream(&file);
+    QString string;
+
+    QHash<QString,QJsonObject> bibs;
+    QHash<QString,QJsonObject> locks;
+    QHash<QString,QJsonObject> times;
+    QHash<QString,QJsonObject> penalties;
+    int row = 0;
+    emit toast("Chargement des dossards...", 3000);
+    bool errorRow = 0;
+    while (true) {
+        row++;
+        string = stream.readLine().trimmed();
+        if (string.isNull()) break;
+        if (string.isEmpty()) continue;
+        qDebug() << string;
+        QStringList tabComma = string.split(',');
+        QStringList tabSemiColumn = string.split(';');
+        QStringList tab = tabComma.count()>tabSemiColumn.count()?tabComma:tabSemiColumn; // take the delimiter that gives the max number of elements
+        // bib number
+        bool ok;
+        int bibnumber = tab[0].toInt(&ok);
+        if (!ok || bibnumber<1) {
+            qWarning() << "Cannot convert the bib number read in this line: " << string;
+            errorRow = row;
+            break;
+        }
+        QString categ = "-";
+        if (tab.count()>1) categ = tab[1];
+        QString schedule = "-";
+        if (tab.count()>2) schedule = tab[2];
+
+        Bib bib(bibnumber);
+        bib.setCateg(categ);
+        bib.setEntry(row);
+        bib.setSchedule(schedule);
+        bibs.insert(bib.id(), bib.jsonParam());
+        locks.insert(bib.id(), bib.jsonLock());
+        times.insert(bib.id(), bib.jsonTime());
+        penalties.insert(bib.id(), bib.jsonPenalty());
+
+    }
+
+    if (errorRow>0) {
+        emit error("Erreur de lecture fichier", QString("Impossible de décoder la ligne %0:\n%1").arg(errorRow).arg(string));
+        return;
+    }
+
+    if (reset) {
+        _db.reset();
+        emit toast("Dossards actuels effacés", 3000);
+    }
+    // save biblist in DB
+    if (bibs.count()>0) {
+        _db.setValueMap(DB_BIB, bibs);
+        _db.setValueMap(DB_LOCKS, locks);
+        _db.setValueMap(DB_TIMES, times);
+        _db.setValueMap(DB_PENALTIES, penalties);
+
+    }
+
+    reloadFromDataBase();
+    orderBibList();
+    emit toast(QString("Liste de %0 dossards chargée").arg(bibs.count()), 4500);
+
+}
+
+void BibList::processCompetFFCKList(const QJsonArray &bibs) {
+    if (bibs.isEmpty()) {
+        emit toast("Aucun dossard reçu de CompetFFCK", 4000);
+        return;
+    }
+
+    QHash<QString,QJsonObject> bibMap;
+    QHash<QString,QJsonObject> locks;
+    QHash<QString,QJsonObject> times;
+    QHash<QString,QJsonObject> penalties;
+    int row = 0;
+
+    for (int i = 0; i < bibs.size(); ++i) {
+        QJsonObject obj = bibs.at(i).toObject();
+        int bibnumber = obj.value("bib").toInt();
+        if (bibnumber < 1) continue;
+
+        row++;
+        Bib bib(bibnumber);
+        QString categ = obj.value("categ").toString();
+        if (categ.isEmpty()) categ = "-";
+        QString schedule = obj.value("schedule").toString();
+        if (schedule.isEmpty()) schedule = "-";
+
+        bib.setCateg(categ);
+        bib.setSchedule(schedule);
+        bib.setEntry(row);
+        bibMap.insert(bib.id(), bib.jsonParam());
+        locks.insert(bib.id(), bib.jsonLock());
+        times.insert(bib.id(), bib.jsonTime());
+        penalties.insert(bib.id(), bib.jsonPenalty());
+    }
+
+    if (bibMap.isEmpty()) {
+        emit error("Chargement CompetFFCK", "Aucun dossard valide dans la réponse CompetFFCK");
+        return;
+    }
+
+    _db.reset();
+    emit toast("Dossards actuels effacés", 3000);
+
+    _db.setValueMap(DB_BIB, bibMap);
+    _db.setValueMap(DB_LOCKS, locks);
+    _db.setValueMap(DB_TIMES, times);
+    _db.setValueMap(DB_PENALTIES, penalties);
+
+    reloadFromDataBase();
+    orderBibList();
+    emit toast(QString("Liste de %0 dossards chargée depuis CompetFFCK").arg(bibMap.count()), 4500);
+}
+
+void BibList::clearPenalties() {
+    foreach (Bib* bib, _bibList) {
+        bib->clearPenalties();
+    }
+    _db.clearTable(DB_PENALTIES);
+    rebuildPenaltyList();
+    emit toast("Penalités effacées", 3000);
+}
+
+void BibList::clearChronos() {
+    beginResetModel();
+    foreach (Bib* bib, _bibList) {
+        bib->clearChronos();
+    }
+    _db.clearTable(DB_TIMES);
+    endResetModel();
+    emit dataChanged(createIndex(0, 0), createIndex(_bibList.count(), 0));
+    emit toast("Chrono effacés", 3000);
+}
+
+void BibList::processIncomingPenaltyList(QList<Penalty> penaltyList) {
+
+    // TODO: to be implemented
+}
+
+void BibList::processIncomingPenalty(int bibnumber, QHash<int, int> penaltyList) {
+    qDebug() << "Biblist processing incoming penalties for bib " << bibnumber;
+    Bib* bib = bibWithIdNumber(bibnumber);
+    if (bib==0) {
+        qWarning() << QString("Cannot find bib id %0 in the list. Ignore.").arg(bibnumber);
+        return;
+    }
+    int bibRow = bibIndex(bibnumber);
+    const int cols = penaltyColumnCount();
+    foreach (int slotOrGate, penaltyList.keys()) {
+        int penaltyValue = penaltyList.value(slotOrGate);
+        int storageKey = slotOrGate;
+        int ffckGate = slotOrGate;
+        int boat = 1; // embarcation CompetFFCK (1=A, 2=B, 3=C)
+        if (_competitionMode == 1) {
+            // Téléphone envoie un index plat : 1=1A, 2=1B, 3=1C, 4=2A, ...
+            if (slotOrGate < 1 || slotOrGate > _gateCount * 3) {
+                qWarning() << "Invalid patrol penalty slot" << slotOrGate << "ignored";
+                continue;
+            }
+            ffckGate = (slotOrGate - 1) / 3 + 1;
+            boat = (slotOrGate - 1) % 3 + 1;
+        }
+        Penalty penalty(bib->id(), storageKey, penaltyValue);
+        if (bib->setPenalty(penalty)) {
+            qDebug() << "Biblist emiting send penalty gate" << ffckGate << "boat" << boat;
+            emit penaltyReceived(bibnumber, ffckGate, boat, penaltyValue);
+            int changedIndex = penaltyModelIndex(bibRow, storageKey);
+            qDebug() << "Changing penalty at index " << changedIndex;
+            _penaltyListModel.setPenalty(changedIndex, QString::number(penaltyValue));
+        }
+        else {
+            qDebug() << "Bib is locked, cannot set penalty. abort.";
+            toast(QString("Dossard %0 est vérrouillé. Pénalité porte %1 ignorée.").arg(bib->id()).arg(ffckGate), 3000);
+        }
+    }
+    _db.setValue(DB_PENALTIES, bib->id(), bib->jsonPenalty());
+    // Notify penalties for this bib has changed
+    int firstIndex = bibRow * cols;
+    int lastIndex = (bibRow + 1) * cols - 1;
+    qDebug() << "Data changed from " << firstIndex << " to " << lastIndex;
+    emit _penaltyListModel.refresh(firstIndex, lastIndex);
+}
+
+void BibList::processIncomingStartTime(int bibnumber, qint64 startTime) {
+    qDebug() << "Biblist processing incoming start time for bib " << bibnumber;
+    Bib* bib = bibWithIdNumber(bibnumber);
+    if (bib==0) {
+        qWarning() << QString("Cannot find bib id %0 in the list. Ignore.").arg(bibnumber);
+        return;
+    }
+    if (bib->setStartTime(startTime)) {
+        _db.setValue(DB_TIMES, bib->id(), bib->jsonTime());
+        int runningTime = bib->runningTime();
+        qDebug() << "RUNNING TIME: "<< runningTime;
+        if (runningTime>0) emit chronoReceived(bibnumber, runningTime);
+        int bibRow = bibIndex(bib->id());
+        emit dataChanged(createIndex(bibRow, 0), createIndex(bibRow, 0));
+    }
+    else {
+        qDebug() << "Bib is locked, cannot set start time. abort.";
+        toast(QString("Dossard %0 est vérrouillé. Heure de départ ignorée.").arg(bib->id()), 3000);
+    }
+
+}
+
+void BibList::processIncomingFinishTime(int bibnumber, qint64 finishTime) {
+    qDebug() << "Biblist processing incoming finish time for bib " << bibnumber;
+    Bib* bib = bibWithIdNumber(bibnumber);
+    if (bib==0) {
+        qWarning() << QString("Cannot find bib id %0 in the list. Ignore.").arg(bibnumber);
+        return;
+    }
+    if (bib->setFinishTime(finishTime)) {
+        _db.setValue(DB_TIMES, bib->id(), bib->jsonTime());
+        int runningTime = bib->runningTime();
+        if (runningTime>0) emit chronoReceived(bibnumber, runningTime);
+        int bibRow = bibIndex(bib->id());
+        emit dataChanged(createIndex(bibRow, 0), createIndex(bibRow, 0));
+    }
+    else {
+        qDebug() << "Bib is locked, cannot set finish time. abort.";
+        toast(QString("Dossard %0 est vérrouillé. Heure d'arrivée ignorée.").arg(bib->id()), 3000);
+    }
+
+}
+
+void BibList::processIncomingLapTime(int bibnumber, int lap, qint64 time){
+
+}
+
+void BibList::selectPenalty(int bibIndex, int gateIndex) {
+
+    qDebug() << QString("You just selected bib index %0 at gate index %1").arg(bibIndex).arg(gateIndex);
+
+}
+
+void BibList::setScheduling(int criteria) {
+
+
+    qDebug() << "Scheduling is now " << criteria;
+    _scheduling = criteria;
+    QSettings settings;
+    settings.setValue("scheduling", _scheduling);
+
+    orderBibList();
+
+}
+
+void BibList::lock(int firstRow, int lastRow) {
+    qDebug() << "Locking row " << firstRow << " to row " << lastRow;
+    QHash<QString,QJsonObject> valueMap;
+    for (int row=firstRow; row<=lastRow; row++) {
+        Bib* bib = bibAtIndex(row);
+        if (bib!=0) {
+            bib->setLocked(true);
+            valueMap.insert(bib->id(), bib->jsonLock());
+        }
+    }
+    _db.setValueMap(DB_LOCKS, valueMap);
+    emit dataChanged(createIndex(firstRow, 0), createIndex(lastRow, 0));
+    emit toast("Dossards vérrouillés", 2000);
+}
+
+void BibList::unlock(int firstRow, int lastRow) {
+    qDebug() << "Unlocking row " << firstRow << " to row " << lastRow;
+    QHash<QString,QJsonObject> valueMap;
+    for (int row=firstRow; row<=lastRow; row++) {
+        Bib* bib = bibAtIndex(row);
+        if (bib!=0) {
+            bib->setLocked(false);
+            valueMap.insert(bib->id(), bib->jsonLock());
+        }
+    }
+    _db.setValueMap(DB_LOCKS, valueMap);
+    emit dataChanged(createIndex(firstRow, 0), createIndex(lastRow, 0));
+    emit toast("Dossards déverrouillés", 2000);
+}
+
+void BibList::forwardBib(int firstRow, int lastRow) {
+    qDebug() << "Forwarding bibs from row " << firstRow << " to row " << lastRow;
+    for (int row=firstRow; row<=lastRow; row++) {
+        Bib* bib = bibAtIndex(row);
+        if (bib!=0) {
+            if (bib->runningTime()>0) emit chronoReceived(bib->idNumber(), bib->runningTime());
+            QHash<int, Penalty> penaltyList = bib->penaltyList();
+            foreach (int key, penaltyList.keys()) {
+                int gate = key;
+                int boat = 1;
+                if (_competitionMode == 1) {
+                    gate = (key - 1) / 3 + 1;
+                    boat = (key - 1) % 3 + 1;
+                }
+                emit penaltyReceived(bib->idNumber(), gate, boat, penaltyList.value(key).value());
+            }
+        }
+    }
+    emit toast("Dossards renvoyés", 2000);
+
+}
+
+QJsonArray BibList::jsonArray(qint64 timestamp) const {
+    Q_UNUSED(timestamp);
+    return bibListForDevices();
+}
+
+QJsonArray BibList::bibListForDevices() const {
+    QJsonArray array;
+    foreach (Bib* bib, _bibList) {
+        if (!bib)
+            continue;
+        QJsonObject obj;
+        obj.insert("bib", bib->idNumber());
+        obj.insert("id", bib->id());
+        obj.insert("categ", bib->categ());
+        obj.insert("schedule", bib->schedule());
+        obj.insert("entry", bib->entry());
+        array.append(obj);
+    }
+    return array;
+}
+
+QList<int> BibList::bibNumberList() const {
+    QList<int> list;
+    foreach (Bib* bib, _bibList) {
+        int number = bib->id().toInt();
+        if (number>0) list << number;
+    }
+    return list;
+}
+
+
+void BibList::rebuildPenaltyList() {
+
+    QStringList stringList;
+    foreach (Bib* bib, _bibList) {
+        stringList << penaltyRowStrings(bib);
+    }
+    _penaltyListModel.reset(stringList);
+    qDebug() << "Penalty list rebuilt:" << _bibList.count() << "bibs x"
+             << penaltyColumnCount() << "columns =" << stringList.count() << "cells";
+
+}
+
+bool BibList::numberLessThan(Bib *bib1, Bib *bib2) {
+    return (bib1->id()<bib2->id());
+}
+
+bool BibList::entryLessThan(Bib *bib1, Bib *bib2) {
+    return (bib1->entry()<bib2->entry());
+}
+
+bool BibList::scheduleLessThan(Bib *bib1, Bib *bib2) {
+    return (bib1->schedule()<bib2->schedule());
+}
+
+void BibList::reloadFromDataBase() {
+
+    qDebug() << "Reloading bib list from database";
+    beginResetModel();
+    qDeleteAll(_bibList);
+    _bibList.clear();
+
+    QHash<QString, QJsonObject> bibs = _db.map(DB_BIB);
+    QHash<QString, QJsonObject> locks = _db.map(DB_LOCKS);
+    QHash<QString, QJsonObject> times = _db.map(DB_TIMES);
+    QHash<QString, QJsonObject> penalties = _db.map(DB_PENALTIES);
+    foreach (QString bibId, bibs.keys()) {
+        QJsonObject bibObj = bibs.value(bibId);
+        Bib* bib = new Bib(bibId, bibObj);
+        bib->setFinishTime((qint64)times.value(bibId).value("finishTime").toDouble());
+        bib->setStartTime((qint64)times.value(bibId).value("startTime").toDouble());
+        QJsonArray penaltyArray = penalties.value(bibId).value("penaltyList").toArray();
+        foreach (QJsonValue jsonValue, penaltyArray) {
+            QJsonObject penaltyObj = jsonValue.toObject();
+            bib->setPenalty(Penalty(penaltyObj));
+        }
+        bib->setLocked(locks.value(bibId).value("locked").toBool(false));
+        //qDebug() << bib->toString();
+        _bibList.append(bib);
+    }
+
+    endResetModel();
+    rebuildPenaltyList();
+    emit bibCountChanged(_bibList.count());
+    
+}
+
+void BibList::orderBibList() {
+    beginResetModel();
+    switch (_scheduling) {
+        case 0 : {
+            std::sort(_bibList.begin(), _bibList.end(), BibList::numberLessThan); // bib number
+            emit toast("Liste ordonnée selon les numéros de dossard croissants", 3000);
+            break;
+        }
+        case 1 : {
+            std::sort(_bibList.begin(), _bibList.end(), BibList::scheduleLessThan); // schedule
+            emit toast("Liste ordonnée selon les heures de départ", 3000);
+            break;
+        }
+        case 2 : {
+            std::sort(_bibList.begin(), _bibList.end(), BibList::entryLessThan); // rank in original file
+            emit toast("Liste ordonnée selon le rang dans le fichier d'origine", 3000);
+            break;
+        }
+    }
+    endResetModel();
+    rebuildPenaltyList();
+}
+
+int BibList::rowCount(const QModelIndex &parent) const {
+    return _bibList.count();
+}
+
+QVariant BibList::data(const QModelIndex &index, int role) const {
+
+    Bib* bib = bibAtIndex(index.row());
+    if (bib==0) return QVariant();
+
+    switch (role) {
+        case BibList::BibId : return QVariant(bib->id());
+        case BibList::BibCateg : return QVariant(bib->categ());
+        case BibList::BibSchedule : return QVariant(bib->schedule());
+        case BibList::BibLocked : return QVariant(bib->locked());
+        case BibList::BibStartTime : return QVariant(bib->startTimeStr());
+        case BibList::BibFinishTime : return QVariant(bib->finishTimeStr());
+        case BibList::BibRunningTime : return QVariant(bib->runningTimeStr());
+
+    }
+
+    return QVariant();
+}
+
+QHash<int, QByteArray> BibList::roleNames() const {
+    QHash<int, QByteArray> hash;
+    hash.insert(BibList::BibId, BIB_ID_NAME);
+    hash.insert(BibList::BibStartTime, BIB_STARTTIME_NAME);
+    hash.insert(BibList::BibFinishTime, BIB_FINISHTIME_NAME);
+    hash.insert(BibList::BibSchedule, BIB_SCHEDULE_NAME);
+    hash.insert(BibList::BibCateg, BIB_CATEG_NAME);
+    hash.insert(BibList::BibRunningTime, BIB_RUNNINGTIME_NAME);
+    hash.insert(BibList::BibLocked, BIB_LOCKED_NAME);
+    return hash;
+}
+
+void BibList::exportAllData(const QString& filename) {
+    qDebug() << "Exporting all data to:" << filename;
+    
+    // Vérifier que le chemin n'est pas vide
+    if (filename.isEmpty()) {
+        emit error("Export impossible", "Aucun fichier sélectionné");
+        return;
+    }
+    
+    QString cleanFilename = localFilePath(filename);
+    qDebug() << "Cleaned filename:" << cleanFilename << "(raw:" << filename << ")";
+    if (cleanFilename.isEmpty()) {
+        emit error("Export impossible", QString("Chemin de fichier invalide:\n%0").arg(filename));
+        return;
+    }
+    
+    // Vérifier le mode de compétition
+    QSettings settings;
+    int competitionMode = settings.value("competitionMode", QVariant(0)).toInt();
+    qDebug() << "Competition mode:" << competitionMode;
+    
+    // Vérifier que le répertoire parent existe
+    QFileInfo fileInfo(cleanFilename);
+    QDir parentDir = fileInfo.absoluteDir();
+    if (!parentDir.exists()) {
+        emit error("Export impossible", QString("Le répertoire n'existe pas:\n%0").arg(parentDir.absolutePath()));
+        return;
+    }
+    
+    // Vérifier les permissions d'écriture en testant la création d'un fichier temporaire
+    QFile testFile(parentDir.absoluteFilePath("test_write_permission.tmp"));
+    if (testFile.open(QFile::WriteOnly)) {
+        testFile.close();
+        testFile.remove(); // Supprimer le fichier de test
+    } else {
+        emit error("Export impossible", QString("Pas de permission d'écriture dans:\n%0").arg(parentDir.absolutePath()));
+        return;
+    }
+    
+    QFile file(cleanFilename);
+    if (!file.open(QFile::WriteOnly | QFile::Text)) {
+        emit error("Export impossible", QString("Impossible de créer le fichier\n%0\nErreur: %1").arg(cleanFilename).arg(file.errorString()));
+        return;
+    }
+    
+    QTextStream out(&file);
+    out.setCodec("UTF-8");
+    
+    // En-tête CSV avec BOM pour Excel
+    out << "\xEF\xBB\xBF"; // BOM UTF-8
+    
+    // En-tête CSV selon le mode
+    QStringList header;
+    if (competitionMode == 0) {
+        // Mode individuel
+        header << "Dossard" << "Catégorie" << "Horaire" << "Départ" << "Arrivée" << "Temps";
+        for (int gate = 1; gate <= _gateCount; gate++) {
+            header << QString("Porte%0").arg(gate);
+        }
+        header << "Statut";
+    } else {
+        // Mode patrouille
+        header << "Patrouille" << "Coureur1" << "Coureur2" << "Coureur3" << "Départ" << "Arrivée" << "Temps" << "Écart(s)" << "Pénalité Écart";
+        for (int gate = 1; gate <= _gateCount; gate++) {
+            header << QString("%0A").arg(gate) << QString("%0B").arg(gate) << QString("%0C").arg(gate);
+        }
+        header << "Statut";
+    }
+    
+    out << header.join(",") << "\n";
+    
+    if (competitionMode == 0) {
+        // Export mode individuel
+        for (int i = 0; i < _bibList.count(); i++) {
+            Bib* bib = _bibList.at(i);
+            if (!bib) continue;
+        
+        QStringList row;
+        
+        // Informations de base - forcer le format texte
+        row << bib->id();
+        row << bib->categ();
+        row << bib->schedule();
+        
+        // Format des heures en texte lisible - forcer le format texte
+        QString startTime = bib->startTimeStr();
+        if (startTime.isEmpty() || startTime == "-") {
+            startTime = "";
+        } else {
+            // Forcer le format texte avec un préfixe pour éviter l'interprétation comme date
+            startTime = "'" + startTime;
+        }
+        row << startTime;
+        
+        QString finishTime = bib->finishTimeStr();
+        if (finishTime.isEmpty() || finishTime == "-") {
+            finishTime = "";
+        } else {
+            // Forcer le format texte avec un préfixe pour éviter l'interprétation comme date
+            finishTime = "'" + finishTime;
+        }
+        row << finishTime;
+        
+        // Format du temps de course en texte lisible
+        QString runningTime = bib->runningTimeStr();
+        if (runningTime.isEmpty() || runningTime == "-") {
+            runningTime = "";
+        } else {
+            // Forcer le format texte avec un préfixe pour éviter l'interprétation comme date
+            runningTime = "'" + runningTime;
+        }
+        row << runningTime;
+        
+        // Pénalités par porte - format texte
+        for (int gate = 1; gate <= _gateCount; gate++) {
+            Penalty penalty = bib->penaltyAtGate(gate);
+            if (penalty.value() >= 0) {
+                row << QString::number(penalty.value());
+            } else {
+                row << "0";
+            }
+        }
+        
+        // Statut
+        row << (bib->locked() ? "Verrouillé" : "Libre");
+        
+        // Joindre les données avec des guillemets pour éviter les problèmes d'interprétation
+        QStringList quotedRow;
+        foreach (const QString &field, row) {
+            // Échapper les guillemets et entourer de guillemets si nécessaire
+            QString escapedField = field;
+            escapedField.replace("\"", "\"\"");
+            
+            // Toujours entourer de guillemets pour forcer le format texte
+            if (!escapedField.isEmpty()) {
+                escapedField = "\"" + escapedField + "\"";
+            }
+            quotedRow << escapedField;
+        }
+        
+        out << quotedRow.join(",") << "\n";
+        }
+    } else {
+        // Export mode patrouille - format simplifié avec colonnes A/B/C
+        for (int i = 0; i < _bibList.count(); i++) {
+            Bib* bib = _bibList.at(i);
+            if (!bib) continue;
+            
+            QStringList row;
+            
+            // Informations de base
+            row << bib->id();
+            row << bib->categ();
+            row << bib->schedule();
+            
+            // Temps de départ
+            QString startTime = "";
+            if (bib->startTime() > 0) {
+                QDateTime startDateTime = QDateTime::fromMSecsSinceEpoch(bib->startTime());
+                startTime = "'" + startDateTime.toString("hh:mm:ss.zzz");
+            }
+            row << startTime;
+            
+            // Temps d'arrivée (pour l'instant, on utilise le temps normal)
+            QString finishTime = "";
+            if (bib->finishTime() > 0) {
+                QDateTime finishDateTime = QDateTime::fromMSecsSinceEpoch(bib->finishTime());
+                finishTime = "'" + finishDateTime.toString("hh:mm:ss.zzz");
+            }
+            row << finishTime;
+            
+            // Temps de course
+            QString runningTime = "";
+            if (bib->runningTime() > 0) {
+                qint64 runningMs = bib->runningTime();
+                int minutes = runningMs / 60000;
+                int seconds = (runningMs % 60000) / 1000;
+                int milliseconds = runningMs % 1000;
+                runningTime = QString("'%0:%1.%2")
+                    .arg(minutes)
+                    .arg(seconds, 2, 10, QChar('0'))
+                    .arg(milliseconds, 3, 10, QChar('0'));
+            }
+            row << runningTime;
+            
+            // Pénalités : index plat 1A,1B,1C,2A,...
+            for (int slot = 1; slot <= _gateCount * 3; slot++) {
+                Penalty penalty = bib->penaltyAtGate(slot);
+                if (penalty.value() >= 0) {
+                    row << QString::number(penalty.value());
+                } else {
+                    row << "0";
+                }
+            }
+            
+            // Statut
+            row << (bib->locked() ? "Verrouillé" : "Libre");
+            
+            // Joindre les données avec des guillemets
+            QStringList quotedRow;
+            foreach (const QString &field, row) {
+                QString escapedField = field;
+                escapedField.replace("\"", "\"\"");
+                if (!escapedField.isEmpty()) {
+                    escapedField = "\"" + escapedField + "\"";
+                }
+                quotedRow << escapedField;
+            }
+            
+            out << quotedRow.join(",") << "\n";
+        }
+    }
+    
+    file.close();
+    emit exportCompleted(filename);
+    
+    if (competitionMode == 0) {
+        emit toast(QString("Export terminé: %0 dossards exportés").arg(_bibList.count()), 3000);
+    } else {
+        emit toast(QString("Export terminé: %0 dossards exportés (mode patrouille)").arg(_bibList.count()), 3000);
+    }
+    qDebug() << "Export completed successfully";
+}
+
+

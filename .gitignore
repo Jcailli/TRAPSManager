@@ -63,4 +63,10 @@ TrapsManager.iss
 App/debug/
 App/release/
 App/release-*/
+trapsmanager/App/debug/
+trapsmanager/App/release/
+build-trapsmanager/
+build-competffck-list/
+build-TRAPSPaperless-*/
+device/
 
