@@ -7,7 +7,7 @@ Passerelle et applications pour la gestion de compétitions canoë-kayak (slalom
 | Dossier | Contenu |
 |---------|---------|
 | **`trapsmanager/`** | Sources **TRAPSManager** (PC, Qt/C++/QML) — serveur / passerelle |
-| **`traps-ck/`** | Sources **TRAPS-CK** (Android, juges) — à importer |
+| **`traps-ck/`** | Sources **TRAPS-CK** (Android, juges) — slalom / kayak cross |
 | **`memory-bank/`** | Documentation projet (Cursor) |
 | **`dist/`** | Artefacts build / installeur (gitignoré) |
 
@@ -22,8 +22,15 @@ Voir aussi `trapsmanager/README-Windows-EXE.md` et `trapsmanager/packaging/READM
 
 ## TRAPS-CK
 
-Voir `traps-ck/README.md`.
+Application Android native (`com.traps.trapsapp`) pour les juges / chronométreurs.
+
+```text
+traps-ck/   ← ouvrir dans Android Studio
+```
+
+Voir `traps-ck/README.md` (build, signature, Docker).
 
 ## Licence
 
-`trapsmanager/LICENSE`
+- Manager : `trapsmanager/LICENSE`
+- TRAPS-CK : `traps-ck/LICENSE`
