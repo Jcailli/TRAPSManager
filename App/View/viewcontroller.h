@@ -4,7 +4,6 @@
 #include <QObject>
 #include "View/dialogbox.h"
 #include "View/filechooser.h"
-#include "DeviceManager/devicemanager.h"
 #include "DeviceManager/deviceconnectionserver.h"
 
 class ViewController : public QObject
@@ -22,7 +21,6 @@ class ViewController : public QObject
     Q_PROPERTY(int competitionMode READ competitionMode NOTIFY competitionModeChanged)
     Q_PROPERTY(int kayakCrossPostCount READ kayakCrossPostCount NOTIFY kayakCrossPostCountChanged)
     Q_PROPERTY(QStringList kayakCrossPostTypes READ kayakCrossPostTypes NOTIFY kayakCrossPostTypesChanged)
-    Q_PROPERTY(DeviceManager* devicemanager READ devicemanager CONSTANT)
     Q_PROPERTY(DeviceConnectionServer* deviceConnectionServer READ deviceConnectionServer CONSTANT)
     Q_PROPERTY(int deviceConnectionPort READ deviceConnectionPort NOTIFY deviceConnectionPortChanged)
 
@@ -42,7 +40,6 @@ public:
     int competitionMode() const { return _competitionMode; }
     int kayakCrossPostCount() const { return _kayakCrossPostCount; }
     QStringList kayakCrossPostTypes() const { return _kayakCrossPostTypes; }
-    DeviceManager* devicemanager() const;
     Q_INVOKABLE void broadcastBibListToDevices();
     Q_INVOKABLE void sendBibListToDevice(const QString &deviceId);
 
@@ -144,7 +141,6 @@ private:
     int _appWindowWidth;
     int _appWindowHeight;
     int _deviceConnectionPort;
-    DeviceManager* _deviceManager;
     DeviceConnectionServer* _deviceConnectionServer;
 };
 

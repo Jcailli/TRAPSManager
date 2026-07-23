@@ -106,4 +106,5 @@ winecfg -v win10
 
 - Documentation : `memory-bank/`
 - Site web : http://www.traps-ck.com
-- Version : 4.5
+- Version : **4.6** (source : `App/version.h`)
+- Packaging : voir `packaging/README.md`

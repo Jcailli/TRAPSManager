@@ -4,7 +4,6 @@
 #include <QSettings>
 #include <QDateTime>
 #include "global.h"
-#include "DeviceManager/devicemanager.h"
 #include "DeviceManager/deviceconnectionserver.h"
 
 ViewController::ViewController(const QStringList& hostList, int requestedTcpPort) : QObject(),
@@ -19,7 +18,6 @@ ViewController::ViewController(const QStringList& hostList, int requestedTcpPort
     _kayakCrossPostTypes(QStringList()),
     _gateCount(25),
     _deviceConnectionPort(8081),
-    _deviceManager(new DeviceManager(this)),
     _deviceConnectionServer(new DeviceConnectionServer(this))
 
 {
@@ -44,10 +42,9 @@ ViewController::ViewController(const QStringList& hostList, int requestedTcpPort
     _deviceConnectionPort = settings.value("deviceConnectionPort", QVariant(8081)).toInt();
     qDebug() << "deviceConnectionPort:" << _deviceConnectionPort;
 
-    // Start device connection server
+    // Start device connection server (port appareils, distinct du port données TCPServer)
     if (_deviceConnectionServer->startServer(_deviceConnectionPort)) {
         qDebug() << "Device connection server started on port" << _deviceConnectionPort;
-        _runningTcpPort = _deviceConnectionPort;
     } else {
         qWarning() << "Failed to start device connection server";
     }
@@ -623,10 +620,6 @@ void ViewController::refreshStatusText() {
     emit statusTextChanged(_statusText);
 }
 
-DeviceManager* ViewController::devicemanager() const {
-    return _deviceManager;
-}
-
 DeviceConnectionServer* ViewController::deviceConnectionServer() const {
     return _deviceConnectionServer;
 }
@@ -638,21 +631,18 @@ int ViewController::deviceConnectionPort() const {
 void ViewController::setDeviceConnectionPort(int port) {
     if (_deviceConnectionPort != port) {
         _deviceConnectionPort = port;
-        
-        // Sauvegarder dans les paramètres
+
         QSettings settings;
         settings.setValue("deviceConnectionPort", _deviceConnectionPort);
-        
-        // Redémarrer le serveur avec le nouveau port
+
         _deviceConnectionServer->stopServer();
         if (_deviceConnectionServer->startServer(_deviceConnectionPort)) {
             qDebug() << "Device connection server restarted on port" << _deviceConnectionPort;
-            _runningTcpPort = _deviceConnectionPort;
             refreshStatusText();
         } else {
             qWarning() << "Failed to restart device connection server on port" << _deviceConnectionPort;
         }
-        
+
         emit deviceConnectionPortChanged(_deviceConnectionPort);
     }
 }

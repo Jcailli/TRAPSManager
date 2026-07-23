@@ -58,4 +58,9 @@ memory-bank
 # Artefacts build Windows / copies locales
 windows-build/
 dist/
+Output/
+TrapsManager.iss
+App/debug/
+App/release/
+App/release-*/
 

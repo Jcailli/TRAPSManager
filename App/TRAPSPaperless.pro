@@ -37,7 +37,6 @@ HEADERS += \
     Update/softwareupdate.h \
     Network/jsonnetworkmanager.h \
     Network/jsonnetworkreply.h \
-    DeviceManager/devicemanager.h \
     DeviceManager/deviceconnectionserver.h \
     DeviceManager/deviceallowlist.h
 
@@ -70,7 +69,6 @@ SOURCES += \
     Update/softwareupdate.cpp \
     Network/jsonnetworkreply.cpp \
     Network/jsonnetworkmanager.cpp \
-    DeviceManager/devicemanager.cpp \
     DeviceManager/deviceconnectionserver.cpp \
     DeviceManager/deviceallowlist.cpp
 
