@@ -29,6 +29,7 @@ public class ModeSelectActivity extends AppCompatActivity {
                 WindowManager.LayoutParams.FLAG_FULLSCREEN);
 
         DeviceConnectionClient client = DeviceConnectionClient.getInstance();
+        client.setAppContext(this);
         client.setListener(new DeviceConnectionClient.Listener() {
             @Override
             public void onRegistered(String deviceId, long serverTime) {
@@ -55,6 +56,11 @@ public class ModeSelectActivity extends AppCompatActivity {
                         .edit()
                         .putLong("lastServerTime", serverTime)
                         .apply();
+            }
+
+            @Override
+            public void onLoadBibList(int count) {
+                // Appliqué en base ; JudgeHub affichera la liste
             }
         });
 
@@ -92,8 +98,7 @@ public class ModeSelectActivity extends AppCompatActivity {
         editor.putInt(ConnectActivity.PREF_COMPETITION_MODE, mode);
         editor.apply();
 
-        // Pont temporaire Phase A → liste existante (Phase B remplacera le flux)
-        Intent intent = new Intent(this, BiblistActivity.class);
+        Intent intent = new Intent(this, JudgeHubActivity.class);
         intent.putExtra(ConnectActivity.PREF_COMPETITION_MODE, mode);
         startActivity(intent);
     }

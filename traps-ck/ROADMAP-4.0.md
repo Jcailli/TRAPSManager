@@ -145,13 +145,13 @@ Le **mode choisi sur le téléphone** doit rester cohérent avec le mode configu
 - [x] Messages d’erreur TCP avec hint pare-feu + cible host:port
 - [x] Port appareils configurable (défaut 8081, **8080 interdit**) — aligné Manager
 - [x] Documenter limite MAC Android (hint UI si MAC non fiable)
-- [x] Pont temporaire vers `BiblistActivity` après choix du mode (remplacé en Phase B)
+- [x] Pont temporaire vers `BiblistActivity` après choix du mode (**remplacé** par `JudgeHubActivity` en Phase B)
 
 ### Phase B — Liste dossards & navigation
-- [ ] Réception / application `loadBibList` depuis Manager
-- [ ] Écran liste dossards après choix du mode
-- [ ] Choix Pénalités / Départ / Arrivée → écrans existants
-- [ ] Retirer le chargement autonome de liste comme chemin nominal
+- [x] Réception / application `loadBibList` depuis Manager
+- [x] Écran liste dossards après choix du mode (`JudgeHubActivity`)
+- [x] Choix Pénalités / Départ / Arrivée → écrans existants (`TerminalConfig` → Penalty/Chrono)
+- [x] Retirer le chargement autonome de liste comme chemin nominal (plus de pont `BiblistActivity`)
 
 ### Phase C — Patrouille (seules adaptations UI métier)
 - [ ] Pénalités patrouille : UI **A/B/C** + envoi clés plates vers Manager

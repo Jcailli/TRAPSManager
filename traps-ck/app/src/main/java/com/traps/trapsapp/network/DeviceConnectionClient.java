@@ -1,8 +1,11 @@
 package com.traps.trapsapp.network;
 
+import android.content.Context;
 import android.os.Handler;
 import android.os.Looper;
 import android.util.Log;
+
+import com.traps.trapsapp.core.ManagerBibListApplier;
 
 import org.json.JSONArray;
 import org.json.JSONObject;
@@ -20,7 +23,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
- * Client TCP supervision Manager (port 8081) : register + heartbeat.
+ * Client TCP supervision Manager : register + heartbeat + commandes (loadBibList).
  * Messages JSON, une ligne = un message (\\n).
  */
 public class DeviceConnectionClient {
@@ -43,6 +46,9 @@ public class DeviceConnectionClient {
         void onDisconnected();
 
         void onHeartbeatAck(long serverTime);
+
+        /** Liste dossards reçue / appliquée (count = nombre de dossards). */
+        void onLoadBibList(int count);
     }
 
     private static DeviceConnectionClient instance;
@@ -55,6 +61,7 @@ public class DeviceConnectionClient {
     private PrintWriter writer;
     private BufferedReader reader;
     private Listener listener;
+    private Context appContext;
     private final Handler heartbeatHandler = new Handler(Looper.getMainLooper());
     private final Runnable heartbeatRunnable = new Runnable() {
         @Override
@@ -72,6 +79,12 @@ public class DeviceConnectionClient {
             instance = new DeviceConnectionClient();
         }
         return instance;
+    }
+
+    public void setAppContext(Context context) {
+        if (context != null) {
+            this.appContext = context.getApplicationContext();
+        }
     }
 
     public void setListener(Listener listener) {
@@ -214,11 +227,48 @@ public class DeviceConnectionClient {
                         }
                     }
                 });
+            } else if ("command".equals(type)) {
+                handleCommand(json);
             } else {
                 Log.d(TAG, "Unhandled message type: " + type);
             }
         } catch (Exception e) {
             Log.e(TAG, "JSON parse error: " + line, e);
+        }
+    }
+
+    private void handleCommand(JSONObject json) {
+        String command = json.optString("command", "");
+        JSONObject parameters = json.optJSONObject("parameters");
+        if ("loadBibList".equals(command)) {
+            JSONArray bibs = parameters != null ? parameters.optJSONArray("bibs") : null;
+            if (bibs == null) {
+                bibs = new JSONArray();
+            }
+            final JSONArray bibsFinal = bibs;
+            // Appliquer hors UI thread (SQLite), puis notifier
+            executor.execute(new Runnable() {
+                @Override
+                public void run() {
+                    final int count;
+                    if (appContext != null) {
+                        count = ManagerBibListApplier.apply(appContext, bibsFinal);
+                    } else {
+                        Log.e(TAG, "loadBibList: no app context");
+                        count = -1;
+                    }
+                    mainHandler.post(new Runnable() {
+                        @Override
+                        public void run() {
+                            if (listener != null) {
+                                listener.onLoadBibList(count);
+                            }
+                        }
+                    });
+                }
+            });
+        } else {
+            Log.d(TAG, "Unhandled command: " + command);
         }
     }
 

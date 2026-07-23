@@ -41,6 +41,11 @@
             android:label="@string/mode_select_title" />
 
         <activity
+            android:name=".JudgeHubActivity"
+            android:exported="false"
+            android:label="@string/hub_title" />
+
+        <activity
             android:name=".BiblistActivity"
             android:exported="false"
             tools:ignore="ExtraText" />

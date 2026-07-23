@@ -13,6 +13,7 @@ import android.widget.TextView;
 import androidx.appcompat.app.AppCompatActivity;
 
 import com.traps.trapsapp.core.DeviceIdentityHelper;
+import com.traps.trapsapp.core.TrapsDB;
 import com.traps.trapsapp.network.DeviceConnectionClient;
 import com.traps.trapsapp.network.UDPListener;
 
@@ -84,6 +85,8 @@ public class ConnectActivity extends AppCompatActivity implements DeviceConnecti
         }
 
         connectionClient = DeviceConnectionClient.getInstance();
+        connectionClient.setAppContext(this);
+        TrapsDB.init(this);
         connectionClient.setListener(this);
 
         // Déjà connecté (retour arrière) → passer aux modes
@@ -236,5 +239,10 @@ public class ConnectActivity extends AppCompatActivity implements DeviceConnecti
     @Override
     public void onHeartbeatAck(long serverTime) {
         getSharedPreferences(PREF_NAME, 0).edit().putLong("lastServerTime", serverTime).apply();
+    }
+
+    @Override
+    public void onLoadBibList(int count) {
+        // Liste appliquée en arrière-plan ; affichage sur JudgeHub
     }
 }

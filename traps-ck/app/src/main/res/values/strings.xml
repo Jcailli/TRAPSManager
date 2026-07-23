@@ -107,4 +107,14 @@
     <string name="mode_patrol">Patrouille</string>
     <string name="mode_kcross">KCross (Trial)</string>
 
+    <string name="hub_title">Dossards</string>
+    <string name="hub_waiting_list">En attente de la liste depuis le Manager</string>
+    <string name="hub_empty_hint">Sur TRAPSManager, envoyez la liste de dossards aux appareils connectés.</string>
+    <string name="hub_bib_count">%1$d dossard(s)</string>
+    <string name="hub_action_penalty">Pénalités</string>
+    <string name="hub_action_start">Départ</string>
+    <string name="hub_action_finish">Arrivée</string>
+    <string name="hub_load_success">%1$d dossard(s) reçus du Manager</string>
+    <string name="hub_load_error">Erreur lors de l\'application de la liste de dossards</string>
+
 </resources>
