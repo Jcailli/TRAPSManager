@@ -23,7 +23,7 @@ signals:
     void incomingPenalty(int, QHash<int, int>);
     // bib number, 0=start, 1=finish, value
     void incomingStartTime(int, qint64); // bib, value
-    void incomingFinishTime(int, qint64); // bib, value
+    void incomingFinishTime(int, qint64, int); // bib, value, finishRole (1=1er, 3=3ème)
     void incomingLapTime(int, int, qint64); // bib, lap number, value
 
 

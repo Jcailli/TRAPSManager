@@ -11,6 +11,8 @@
 
 #define BIB_ID_NAME "bibData"
 #define BIB_FINISHTIME_NAME "finishTimeData"
+#define BIB_FINISHTIME_FIRST_NAME "finishTimeFirstData"
+#define BIB_TIMEGAP_NAME "timeGapData"
 #define BIB_STARTTIME_NAME "startTimeData"
 #define BIB_RUNNINGTIME_NAME "runningTimeData"
 #define BIB_SCHEDULE_NAME "scheduleData"
@@ -35,7 +37,9 @@ public:
         BibRunningTime,
         BibSchedule,
         BibCateg,
-        BibLocked
+        BibLocked,
+        BibFinishTimeFirst,
+        BibTimeGap
     };
 
     explicit BibList();
@@ -66,7 +70,7 @@ public slots:
     void processIncomingPenaltyList(QList<Penalty> penaltyList);
     void processIncomingPenalty(int, QHash<int, int>);
     void processIncomingStartTime(int bibnumber, qint64 startTime);
-    void processIncomingFinishTime(int bibnumber, qint64 finishTime);
+    void processIncomingFinishTime(int bibnumber, qint64 finishTime, int finishRole);
     void processIncomingLapTime(int bibnumber, int lap, qint64 time);
     void exportAllData(const QString& filename);
 

@@ -9,11 +9,14 @@ import android.graphics.Color;
 import android.graphics.Typeface;
 import android.util.Log;
 import android.util.SparseIntArray;
+import android.view.LayoutInflater;
 import android.view.View;
+import android.view.ViewGroup;
 import android.widget.AdapterView;
 import android.widget.ArrayAdapter;
 import android.widget.Button;
 import android.widget.CheckBox;
+import android.widget.LinearLayout;
 import android.widget.Spinner;
 import android.widget.TextView;
 
@@ -28,11 +31,15 @@ import java.util.Map;
 public class PenaltyPad implements DialogInterface.OnMultiChoiceClickListener,
         DialogInterface.OnClickListener {
 
-    // Boutons et textes du Pad physique (taille SystemParam.MAX_GATE_PER_TERMINAL)
-    private Button[][] penButton = new Button[SystemParam.MAX_GATE_PER_TERMINAL][3];
-    private TextView[] penText = new TextView[SystemParam.MAX_GATE_PER_TERMINAL];
-    private View[] rowView = new View[SystemParam.MAX_GATE_PER_TERMINAL];
+    // Pad : jusqu'à 15 lignes en patrouille (5 portes × A/B/C)
+    private static final int PAD_CAPACITY = SystemParam.MAX_PATROL_PAD_ROWS;
+    private Button[][] penButton = new Button[PAD_CAPACITY][3];
+    private TextView[] penText = new TextView[PAD_CAPACITY];
+    private View[] rowView = new View[PAD_CAPACITY];
+    private TextView[] porteHeaders = new TextView[SystemParam.MAX_GATE_PER_TERMINAL];
+    private View[] porteHeaderContainers = new View[SystemParam.MAX_GATE_PER_TERMINAL];
     private Map<Button, PenaltyButton> buttonMap = new HashMap<>();
+    private int padCapacityUsed = SystemParam.MAX_GATE_PER_TERMINAL;
 
     // --- Constantes KCross (Affichage seulement) ---
     public static final int SECTOR_TYPE_GATE = 0;
@@ -47,12 +54,15 @@ public class PenaltyPad implements DialogInterface.OnMultiChoiceClickListener,
 
     // --- Mode de fonctionnement ---
     private boolean isKCrossMode;
+    private boolean isPatrolMode;
     private PenaltyActivity terminal;
     private TrapsDB db;
+    private boolean padLocked = false;
 
-    // --- Configuration Slalom ---
-    private int[] gateIndex = new int[SystemParam.MAX_GATE_PER_TERMINAL];
-    private int[] penalty = new int[SystemParam.MAX_GATE_PER_TERMINAL];
+    // --- Configuration Slalom / Patrouille ---
+    private int[] gateIndex = new int[PAD_CAPACITY];
+    private int[] boatIndex = new int[PAD_CAPACITY]; // 0=A,1=B,2=C (patrouille)
+    private int[] penalty = new int[PAD_CAPACITY];
     private boolean[] gateSelection = new boolean[SystemParam.GATE_COUNT];
     private static String[] gateStringListSlalom = new String[SystemParam.GATE_COUNT];
     private boolean[] tmpGateSelectionSlalom = new boolean[SystemParam.GATE_COUNT];
@@ -98,37 +108,25 @@ public class PenaltyPad implements DialogInterface.OnMultiChoiceClickListener,
     public PenaltyPad(PenaltyActivity terminal, String penaltyLayoutMode) {
         this.terminal = terminal;
         this.isKCrossMode = TerminalConfigActivity.LAYOUT_MODE_KCROSS.equals(penaltyLayoutMode);
+        this.isPatrolMode = !isKCrossMode && CompetitionModeHelper.isPatrol(terminal);
         this.db = TrapsDB.getInstance();
+        this.padCapacityUsed = isPatrolMode
+                ? SystemParam.MAX_PATROL_PAD_ROWS
+                : SystemParam.MAX_GATE_PER_TERMINAL;
 
-        penButton[0][0] = (Button) terminal.findViewById(R.id.penalty00);
-        penButton[0][1] = (Button) terminal.findViewById(R.id.penalty01);
-        penButton[0][2] = (Button) terminal.findViewById(R.id.penalty02);
-        penButton[1][0] = (Button)terminal.findViewById(R.id.penalty10);
-		penButton[1][1] = (Button)terminal.findViewById(R.id.penalty11);
-		penButton[1][2] = (Button)terminal.findViewById(R.id.penalty12);
-		penButton[2][0] = (Button)terminal.findViewById(R.id.penalty20);
-		penButton[2][1] = (Button)terminal.findViewById(R.id.penalty21);
-		penButton[2][2] = (Button)terminal.findViewById(R.id.penalty22);
-		penButton[3][0] = (Button)terminal.findViewById(R.id.penalty30);
-		penButton[3][1] = (Button)terminal.findViewById(R.id.penalty31);
-		penButton[3][2] = (Button)terminal.findViewById(R.id.penalty32);
-		penButton[4][0] = (Button)terminal.findViewById(R.id.penalty40);
-		penButton[4][1] = (Button)terminal.findViewById(R.id.penalty41);
-		penButton[4][2] = (Button)terminal.findViewById(R.id.penalty42);
+        for (int i = 0; i < PAD_CAPACITY; i++) {
+            boatIndex[i] = 0;
+        }
 
-        penText[0] = (TextView) terminal.findViewById(R.id.gateText0);
-        penText[1] = (TextView)terminal.findViewById(R.id.gateText1);
-		penText[2] = (TextView)terminal.findViewById(R.id.gateText2);
-		penText[3] = (TextView)terminal.findViewById(R.id.gateText3);
-		penText[4] = (TextView)terminal.findViewById(R.id.gateText4);
+        if (isPatrolMode) {
+            buildPatrolPadViews();
+        } else {
+            bindClassicPadViews();
+        }
 
-        rowView[0] = (View) terminal.findViewById(R.id.row0);
-        rowView[1] = (View)terminal.findViewById(R.id.row1);
-		rowView[2] = (View)terminal.findViewById(R.id.row2);
-		rowView[3] = (View)terminal.findViewById(R.id.row3);
-		rowView[4] = (View)terminal.findViewById(R.id.row4);
-
-        for(int i=0; i < SystemParam.MAX_GATE_PER_TERMINAL; ++i) padToKCrossSetupIndexMap[i] = -1;
+        for (int i = 0; i < SystemParam.MAX_GATE_PER_TERMINAL; ++i) {
+            padToKCrossSetupIndexMap[i] = -1;
+        }
 
         if (isKCrossMode) {
             loadKCrossConfigFromPrefs();
@@ -156,9 +154,77 @@ public class PenaltyPad implements DialogInterface.OnMultiChoiceClickListener,
         setOnClickListenerToButtons();
     }
 
+    private void bindClassicPadViews() {
+        penButton[0][0] = (Button) terminal.findViewById(R.id.penalty00);
+        penButton[0][1] = (Button) terminal.findViewById(R.id.penalty01);
+        penButton[0][2] = (Button) terminal.findViewById(R.id.penalty02);
+        penButton[1][0] = (Button) terminal.findViewById(R.id.penalty10);
+        penButton[1][1] = (Button) terminal.findViewById(R.id.penalty11);
+        penButton[1][2] = (Button) terminal.findViewById(R.id.penalty12);
+        penButton[2][0] = (Button) terminal.findViewById(R.id.penalty20);
+        penButton[2][1] = (Button) terminal.findViewById(R.id.penalty21);
+        penButton[2][2] = (Button) terminal.findViewById(R.id.penalty22);
+        penButton[3][0] = (Button) terminal.findViewById(R.id.penalty30);
+        penButton[3][1] = (Button) terminal.findViewById(R.id.penalty31);
+        penButton[3][2] = (Button) terminal.findViewById(R.id.penalty32);
+        penButton[4][0] = (Button) terminal.findViewById(R.id.penalty40);
+        penButton[4][1] = (Button) terminal.findViewById(R.id.penalty41);
+        penButton[4][2] = (Button) terminal.findViewById(R.id.penalty42);
+
+        penText[0] = (TextView) terminal.findViewById(R.id.gateText0);
+        penText[1] = (TextView) terminal.findViewById(R.id.gateText1);
+        penText[2] = (TextView) terminal.findViewById(R.id.gateText2);
+        penText[3] = (TextView) terminal.findViewById(R.id.gateText3);
+        penText[4] = (TextView) terminal.findViewById(R.id.gateText4);
+
+        rowView[0] = terminal.findViewById(R.id.row0);
+        rowView[1] = terminal.findViewById(R.id.row1);
+        rowView[2] = terminal.findViewById(R.id.row2);
+        rowView[3] = terminal.findViewById(R.id.row3);
+        rowView[4] = terminal.findViewById(R.id.row4);
+    }
+
+    /** Construit 5 blocs « Porte X » + 3 lignes A/B/C dans le ScrollView. */
+    private void buildPatrolPadViews() {
+        ViewGroup host = terminal.findViewById(R.id.patrolPadHost);
+        if (host == null) {
+            Log.e("PenaltyPad", "patrolPadHost missing");
+            return;
+        }
+        host.removeAllViews();
+        LayoutInflater inflater = LayoutInflater.from(terminal);
+        int padRow = 0;
+        for (int section = 0; section < SystemParam.MAX_GATE_PER_TERMINAL; section++) {
+            TextView header = (TextView) inflater.inflate(R.layout.item_porte_header, host, false);
+            header.setText("Porte " + (section + 1));
+            header.setVisibility(View.GONE);
+            porteHeaders[section] = header;
+            porteHeaderContainers[section] = header;
+            host.addView(header);
+
+            for (int boat = 0; boat < 3; boat++) {
+                View row = inflater.inflate(R.layout.item_penalty_pad_row, host, false);
+                row.setVisibility(View.GONE);
+                TextView gateText = row.findViewById(R.id.gateText);
+                Button b0 = row.findViewById(R.id.penalty0);
+                Button b2 = row.findViewById(R.id.penalty2);
+                Button b50 = row.findViewById(R.id.penalty50);
+                // Ordre pad : [0]=0, [1]=2, [2]=50 (comme layout classique)
+                penButton[padRow][0] = b0;
+                penButton[padRow][1] = b2;
+                penButton[padRow][2] = b50;
+                penText[padRow] = gateText;
+                rowView[padRow] = row;
+                host.addView(row);
+                padRow++;
+            }
+        }
+    }
+
     private void buildButtonMapSlalom() {
         buttonMap.clear();
-        for (int padRowIndex = 0; padRowIndex < SystemParam.MAX_GATE_PER_TERMINAL; padRowIndex++) {
+        for (int padRowIndex = 0; padRowIndex < padCapacityUsed; padRowIndex++) {
+            if (penButton[padRowIndex][0] == null) continue;
             buttonMap.put(penButton[padRowIndex][0], new PenaltyButton(padRowIndex, 0, PENALTY_VALUE_0_CLR));
             buttonMap.put(penButton[padRowIndex][1], new PenaltyButton(padRowIndex, 1, PENALTY_VALUE_2_FLT));
             buttonMap.put(penButton[padRowIndex][2], new PenaltyButton(padRowIndex, 2, PENALTY_VALUE_50_RAL));
@@ -177,6 +243,9 @@ public class PenaltyPad implements DialogInterface.OnMultiChoiceClickListener,
     private void setOnClickListenerToButtons() {
         for (View button : buttonMap.keySet()) {
             button.setOnClickListener(v -> {
+                if (padLocked) {
+                    return;
+                }
                 PenaltyButton penaltyButtonData = buttonMap.get(v);
                 if (penaltyButtonData != null) {
                     setPenalty(penaltyButtonData.getGateIndex(), penaltyButtonData.getValue());
@@ -190,6 +259,18 @@ public class PenaltyPad implements DialogInterface.OnMultiChoiceClickListener,
         }
     }
 
+    public void setPadLocked(boolean locked) {
+        this.padLocked = locked;
+    }
+
+    public boolean isPadLocked() {
+        return padLocked;
+    }
+
+    public boolean isPatrolMode() {
+        return isPatrolMode;
+    }
+
     private void resetGateSelectionSlalom() {
         for (int i = 0; i < SystemParam.GATE_COUNT; i++) gateSelection[i] = false;
         rowCountSlalom = 0;
@@ -198,11 +279,50 @@ public class PenaltyPad implements DialogInterface.OnMultiChoiceClickListener,
     private void setGateSelectionSlalom(boolean[] selectedGlobalGates) {
         resetGateSelectionSlalom();
         int currentPadRow = 0;
+        int maxPhysicalGates = SystemParam.MAX_GATE_PER_TERMINAL;
+        int physicalSelected = 0;
+        int headerSlot = 0;
+
+        if (isPatrolMode) {
+            for (int h = 0; h < SystemParam.MAX_GATE_PER_TERMINAL; h++) {
+                if (porteHeaders[h] != null) {
+                    porteHeaders[h].setVisibility(View.GONE);
+                }
+            }
+        }
+
         for (int globalGateIdx = 0; globalGateIdx < selectedGlobalGates.length; globalGateIdx++) {
-            if (currentPadRow >= SystemParam.MAX_GATE_PER_TERMINAL) break;
-            if (selectedGlobalGates[globalGateIdx]) {
-                gateSelection[globalGateIdx] = true;
+            if (!selectedGlobalGates[globalGateIdx]) {
+                continue;
+            }
+            if (physicalSelected >= maxPhysicalGates) {
+                break;
+            }
+            gateSelection[globalGateIdx] = true;
+            physicalSelected++;
+
+            if (isPatrolMode) {
+                if (headerSlot < porteHeaders.length && porteHeaders[headerSlot] != null) {
+                    int porteNum = globalGateIdx + 1;
+                    porteHeaders[headerSlot].setText("Porte " + porteNum);
+                    porteHeaders[headerSlot].setVisibility(View.VISIBLE);
+                    headerSlot++;
+                }
+                for (int boat = 0; boat < 3 && currentPadRow < padCapacityUsed; boat++) {
+                    gateIndex[currentPadRow] = globalGateIdx;
+                    boatIndex[currentPadRow] = boat;
+                    rowView[currentPadRow].setVisibility(View.VISIBLE);
+                    penText[currentPadRow].setText("  " + SystemParam.boatLetter(boat) + "  ");
+                    resetPenaltyUIForPadRow(currentPadRow);
+                    penalty[currentPadRow] = -1;
+                    currentPadRow++;
+                }
+            } else {
+                if (currentPadRow >= padCapacityUsed) {
+                    break;
+                }
                 gateIndex[currentPadRow] = globalGateIdx;
+                boatIndex[currentPadRow] = 0;
                 rowView[currentPadRow].setVisibility(View.VISIBLE);
                 penText[currentPadRow].setText(gateStringListSlalom[globalGateIdx]);
                 resetPenaltyUIForPadRow(currentPadRow);
@@ -211,10 +331,20 @@ public class PenaltyPad implements DialogInterface.OnMultiChoiceClickListener,
             }
         }
         rowCountSlalom = currentPadRow;
-        for (int i = currentPadRow; i < SystemParam.MAX_GATE_PER_TERMINAL; i++) {
-            rowView[i].setVisibility(View.GONE);
+        for (int i = currentPadRow; i < padCapacityUsed; i++) {
+            if (rowView[i] != null) {
+                rowView[i].setVisibility(View.GONE);
+            }
+        }
+        if (isPatrolMode) {
+            for (int h = headerSlot; h < SystemParam.MAX_GATE_PER_TERMINAL; h++) {
+                if (porteHeaders[h] != null) {
+                    porteHeaders[h].setVisibility(View.GONE);
+                }
+            }
         }
         db.setGateSelection(gateSelection);
+        adaptNavArrowHeight(physicalSelected);
     }
 
     private void applyKCrossConfigurationToUI() {
@@ -239,6 +369,38 @@ public class PenaltyPad implements DialogInterface.OnMultiChoiceClickListener,
                 padRowDisplayIndex++;
             }
         }
+        adaptNavArrowHeight(padRowDisplayIndex);
+    }
+
+    /**
+     * Hauteur des flèches entre min et max selon le nombre de portes / secteurs affichés.
+     * 1 porte → max ; 5 portes → min.
+     */
+    private void adaptNavArrowHeight(int selectedCount) {
+        if (terminal == null) {
+            return;
+        }
+        View nav = terminal.findViewById(R.id.rowButton);
+        if (nav == null) {
+            return;
+        }
+        final int minDp = 72;
+        final int maxDp = 168;
+        int maxGates = Math.max(1, SystemParam.MAX_GATE_PER_TERMINAL);
+        int count = Math.max(1, Math.min(selectedCount, maxGates));
+        float t = (maxGates == 1) ? 1f : (count - 1) / (float) (maxGates - 1);
+        int heightDp = Math.round(maxDp - t * (maxDp - minDp));
+        float density = terminal.getResources().getDisplayMetrics().density;
+        int heightPx = Math.round(heightDp * density);
+
+        ViewGroup.LayoutParams lp = nav.getLayoutParams();
+        lp.height = heightPx;
+        if (lp instanceof LinearLayout.LayoutParams) {
+            ((LinearLayout.LayoutParams) lp).weight = 0f;
+        }
+        nav.setLayoutParams(lp);
+        nav.setMinimumHeight(Math.round(minDp * density));
+        nav.requestLayout();
     }
 
     public void setPenalty(int padRowIndex, int value) {
@@ -267,7 +429,7 @@ public class PenaltyPad implements DialogInterface.OnMultiChoiceClickListener,
     }
 
     private void resetPenaltyUIForPadRow(int padRowIndex) {
-        if (padRowIndex < 0 || padRowIndex >= SystemParam.MAX_GATE_PER_TERMINAL) return;
+        if (padRowIndex < 0 || padRowIndex >= PAD_CAPACITY || penButton[padRowIndex][0] == null) return;
         for (int i = 0; i < 3; i++) {
             penButton[padRowIndex][i].setBackgroundResource(R.drawable.penalty);
             penButton[padRowIndex][i].setTextColor(Color.LTGRAY);
@@ -276,7 +438,7 @@ public class PenaltyPad implements DialogInterface.OnMultiChoiceClickListener,
     }
 
     private void highlightButtonForPenalty(int padRowIndex, int penaltyValue) {
-        if (padRowIndex < 0 || padRowIndex >= SystemParam.MAX_GATE_PER_TERMINAL) return;
+        if (padRowIndex < 0 || padRowIndex >= PAD_CAPACITY || penButton[padRowIndex][0] == null) return;
         int buttonColumnIndex = -1;
         switch (penaltyValue) {
             case PENALTY_VALUE_0_CLR: buttonColumnIndex = 0; break;
@@ -307,9 +469,13 @@ public class PenaltyPad implements DialogInterface.OnMultiChoiceClickListener,
                     values.put(kCrossSetupIdx, setup.currentPenaltyValue);
                 }
             }
-        } else { // Slalom
+        } else { // Slalom / Patrouille
             for (int i = 0; i < rowCountSlalom; i++) {
-                values.put(gateIndex[i], penalty[i]); // gateIndex[i] est l'index global de la porte
+                if (isPatrolMode) {
+                    values.put(SystemParam.flatSlot(gateIndex[i], boatIndex[i]), penalty[i]);
+                } else {
+                    values.put(gateIndex[i], penalty[i]); // gateIndex[i] est l'index global de la porte
+                }
             }
         }
         return values;
@@ -347,10 +513,13 @@ public class PenaltyPad implements DialogInterface.OnMultiChoiceClickListener,
                 }
             }
 
-        } else { // Slalom
+        } else { // Slalom / Patrouille
             for (int i = 0; i < rowCountSlalom; i++) {
                 resetPenaltyUIForPadRow(i);
-                int penValueFromMap = map.get(gateIndex[i], -1);
+                int key = isPatrolMode
+                        ? SystemParam.flatSlot(gateIndex[i], boatIndex[i])
+                        : gateIndex[i];
+                int penValueFromMap = map.get(key, -1);
                 penalty[i] = penValueFromMap;
                 if (penValueFromMap != -1) {
                     highlightButtonForPenalty(i, penValueFromMap);
@@ -366,7 +535,7 @@ public class PenaltyPad implements DialogInterface.OnMultiChoiceClickListener,
         } else {
             tmpGateSelectionSlalom = gateSelection.clone();
             return new AlertDialog.Builder(activity)
-                    .setTitle("Choix des portes")
+                    .setTitle(isPatrolMode ? "Choix des portes (A/B/C, 5 max)" : "Choix des portes")
                     .setMultiChoiceItems(gateStringListSlalom, tmpGateSelectionSlalom, this)
                     .setPositiveButton("OK", this)
                     .setNegativeButton("Annuler", this)
@@ -548,8 +717,12 @@ public class PenaltyPad implements DialogInterface.OnMultiChoiceClickListener,
             if (which == DialogInterface.BUTTON_POSITIVE) {
                 int counter = 0;
                 for (boolean selected : tmpGateSelectionSlalom) if (selected) counter++;
-                if (counter > SystemParam.MAX_GATE_PER_TERMINAL) {
-                    Utility.alert(terminal, "Trop de portes sélectionnées (" + SystemParam.MAX_GATE_PER_TERMINAL + " max)", "Erreur");
+                int maxGates = SystemParam.MAX_GATE_PER_TERMINAL;
+                if (counter > maxGates) {
+                    Utility.alert(terminal, "Erreur",
+                            isPatrolMode
+                                    ? ("Trop de portes (" + maxGates + " max, chacune en A/B/C)")
+                                    : ("Trop de portes sélectionnées (" + maxGates + " max)"));
                 } else {
                     setGateSelectionSlalom(tmpGateSelectionSlalom);
                 }

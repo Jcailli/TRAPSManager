@@ -41,7 +41,7 @@ ConnectionHandler* ConnectionHandlerPool::getConnectionHandler() {
             freeHandler = new ConnectionHandler(_bibList);
             connect(freeHandler, SIGNAL(incomingPenalty(int,QHash<int,int>)), _bibList, SLOT(processIncomingPenalty(int,QHash<int,int>)));
             connect(freeHandler, SIGNAL(incomingStartTime(int,qint64)), _bibList, SLOT(processIncomingStartTime(int,qint64)));
-            connect(freeHandler, SIGNAL(incomingFinishTime(int,qint64)), _bibList, SLOT(processIncomingFinishTime(int,qint64)));
+            connect(freeHandler, SIGNAL(incomingFinishTime(int,qint64,int)), _bibList, SLOT(processIncomingFinishTime(int,qint64,int)));
             connect(freeHandler, SIGNAL(incomingLapTime(int,int,qint64)), _bibList, SLOT(processIncomingLapTime(int,int,qint64)));
             freeHandler->setBusy();
             _pool.append(freeHandler);

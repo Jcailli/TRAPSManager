@@ -1,7 +1,7 @@
 # Roadmap TRAPS-CK 4.0
 
 Document de cadrage pour l’évolution de l’application Android juges (`traps-ck/`).  
-Dernière mise à jour : **2026-07-23**.
+Dernière mise à jour : **2026-07-23** (Phase C livrée).
 
 ---
 
@@ -48,7 +48,7 @@ Aligner TRAPS-CK sur TRAPSManager moderne :
 | Liste de dossards | **Uniquement depuis le Manager** (`loadBibList`) |
 | Base de temps | Sync **depuis le Manager** ; s’applique à **départ, arrivée et pénalités** |
 | Connexion | Garde-fou avant tout usage métier |
-| Cadenas (lock) | Après **envoi réussi** d’une info (pénalité, départ ou arrivée) → cadenas **actif** automatiquement. Après déverrouillage, toute **modification** exige une **confirmation** (comportement déjà en place pour départ/arrivée ; à appliquer aussi aux **pénalités**, y compris A/B/C et Arrivée 1/3) |
+| Cadenas (lock) | Après **envoi** (pénalité / départ / arrivée) → cadenas **actif** auto. **Confirmations** : déverrouillage + flèches prev/next si données modifiées. **Pas** de confirmation à chaque touche (pénalité / départ / arrivée). |
 
 ---
 
@@ -154,12 +154,15 @@ Le **mode choisi sur le téléphone** doit rester cohérent avec le mode configu
 - [x] Retirer le chargement autonome de liste comme chemin nominal (plus de pont `BiblistActivity`)
 
 ### Phase C — Patrouille (seules adaptations UI métier)
-- [ ] Pénalités patrouille : UI **A/B/C** + envoi clés plates vers Manager
-- [ ] Arrivée patrouille : UI **Arrivée 1** + **Arrivée 3** + mapping colonnes Manager
-- [ ] Départ patrouille : conserver UI actuelle
-- [ ] Individuel / KCross Trial : valider flux sans changement UI
-- [ ] **Cadenas pénalités** : verrouillage auto après envoi (comme départ/arrivée)
-- [ ] Après déverrouillage : **confirmation** avant tout changement (pénalités + chronos, tous modes)
+- [x] Pénalités patrouille : UI **A/B/C** (jusqu’à 5 portes) + envoi clés plates vers Manager
+- [x] Arrivée patrouille : UI **Arrivée 1** + **Arrivée 3** + mapping colonnes Manager (`finishRole`) + écart
+- [x] Départ patrouille : conserver UI actuelle
+- [x] Individuel / KCross Trial : flux inchangé (mode non patrouille)
+- [x] **Cadenas** : verrouillage auto après envoi ; confirmation au **déverrouillage** ; confirmation aux **flèches** si données modifiées ; **pas** de confirm à chaque touche
+- [x] Arrivée patrouille : après unlock, reprendre A1 **et** A3 ; contrainte **A1 ≤ A3** ; flèches navigables même cadenas fermé
+- [x] `loadBibList` : remplace la liste et **réinitialise** pénalités / départ / arrivée / cadenas
+- [x] Flèches pénalités : hauteur adaptative (min–max) selon nombre de portes (individuel / patrouille / KCross)
+- [x] Manager : colonnes Arrivée 1 / 3 / Écart + fenêtre Appareils indépendante (commit séparé)
 
 ### Phase D — Sync base de temps
 - [ ] Protocole `syncTime` / offset (Manager + app)
@@ -182,7 +185,9 @@ Le **mode choisi sur le téléphone** doit rester cohérent avec le mode configu
 | Allowlist MAC/IP + 8081 register/heartbeat | Existe |
 | `loadBibList` | Existe |
 | Sync base de temps (commande + UI) | **À faire** |
-| Hello avec port 8081 | Optionnel (sinon 8081 fixe) |
+| Dual finish Arrivée 1 / 3 (`finishRole`) + écart | **Fait** (Phase C) |
+| Fenêtre Appareils indépendante | **Fait** |
+| Hello avec port appareils | Optionnel |
 | Affichage / aide saisie MAC | Amélioration UX possible |
 
 ---

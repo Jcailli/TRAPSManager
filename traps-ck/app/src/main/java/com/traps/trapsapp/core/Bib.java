@@ -12,14 +12,16 @@ import android.util.SparseIntArray;
 public class Bib {
  
 	public static final int CHRONO_START = 0;
-	public static final int CHRONO_FINISH = 0;
+	public static final int CHRONO_FINISH = 1;       // arrivée (3ème en patrouille)
+	public static final int CHRONO_FINISH_FIRST = 2; // arrivée 1er (patrouille)
 
 	private int bibnumber;
 	private int index;
-	private int[] pen = new int[SystemParam.GATE_COUNT];
+	private int[] pen = new int[SystemParam.MAX_PENALTY_SLOTS];
 	private boolean locked = false;
 	private long start = 0;
 	private long finish = 0;
+	private long finishFirst = 0;
 	private boolean checked = false;
 	private static SimpleDateFormat dateFormatter1 = new SimpleDateFormat("HH:mm:ss.SSS", Locale.US);
 	private static SimpleDateFormat dateFormatter2 = new SimpleDateFormat("mm:ss.SSS", Locale.US);
@@ -30,11 +32,13 @@ public class Bib {
 		locked = false;
 		start = 0;
 		finish = 0;
+		finishFirst = 0;
 		resetPenalties();
 	}
 	
 	public long getChrono(int whichone) {
-		if (whichone==CHRONO_START) return start;
+		if (whichone == CHRONO_START) return start;
+		if (whichone == CHRONO_FINISH_FIRST) return finishFirst;
 		return finish;
 	}
 	
@@ -45,7 +49,8 @@ public class Bib {
 	}
 	
 	public void setChrono(int type, long chrono) {
-		if (type==CHRONO_START) setStart(chrono);
+		if (type == CHRONO_START) setStart(chrono);
+		else if (type == CHRONO_FINISH_FIRST) setFinishFirst(chrono);
 		else setFinish(chrono);
 	}
 	
@@ -61,11 +66,12 @@ public class Bib {
 	}
 	
 	public void resetPenalties() {
-		for (int i=0; i<SystemParam.GATE_COUNT; i++) {
+		for (int i = 0; i < SystemParam.MAX_PENALTY_SLOTS; i++) {
 			pen[i] = -1;
 		}
 		start = 0;
 		finish = 0;
+		finishFirst = 0;
 	}
 
 	
@@ -78,23 +84,23 @@ public class Bib {
 		return Utility.digit3(bibnumber);
 	}
 
-	// return penalty at specific gateIndex
+	// return penalty at specific gateIndex / flat slot
 	public int getPenalty(int gateIndex) {
-		if ((gateIndex<0) || (gateIndex>=SystemParam.GATE_COUNT)) return -1;
+		if ((gateIndex<0) || (gateIndex>=SystemParam.MAX_PENALTY_SLOTS)) return -1;
 		return pen[gateIndex];
 	}
 	
 	//return total of penalty
 	public int getPenalty() {
 		int sum = 0;
-		for (int i=0; i<SystemParam.GATE_COUNT; i++)
+		for (int i=0; i<SystemParam.MAX_PENALTY_SLOTS; i++)
 			if (pen[i]>-1) sum += pen[i];
 		return sum;
 	}
 
 	public String getPenaltyString() {
-		StringBuffer sb = new StringBuffer(SystemParam.GATE_COUNT);
-		for (int i=0; i<SystemParam.GATE_COUNT; i++) {
+		StringBuffer sb = new StringBuffer(SystemParam.MAX_PENALTY_SLOTS);
+		for (int i=0; i<SystemParam.MAX_PENALTY_SLOTS; i++) {
 			switch (pen[i]) {
 				case 0: sb.append('0'); break;
 				case 2: sb.append('2'); break;
@@ -125,7 +131,7 @@ public class Bib {
 	public SparseIntArray getPenaltyMap(Set<Integer> gateSet) {
 		SparseIntArray values = new SparseIntArray();
 		if (gateSet==null) 
-			for (int index=0; index<SystemParam.GATE_COUNT; index++)
+			for (int index=0; index<SystemParam.MAX_PENALTY_SLOTS; index++)
 				values.put(index, pen[index]);
 		else
 			for (Integer gateIndex : gateSet) {
@@ -143,13 +149,13 @@ public class Bib {
 	 */
 	public SparseIntArray getPenaltyMap() {
 		SparseIntArray values = new SparseIntArray();
-		for (int index=0; index<SystemParam.GATE_COUNT; index++)
+		for (int index=0; index<SystemParam.MAX_PENALTY_SLOTS; index++)
 			if (pen[index]>-1) values.put(index, pen[index]);
 		return values;
 	}
-	// gateId always starts at 1
+	// gateId / flat slot always starts at 0
 	public void setPen(int gateIndex, int value) {
-		if ((gateIndex<0) || (gateIndex>=SystemParam.GATE_COUNT)) return;
+		if ((gateIndex<0) || (gateIndex>=SystemParam.MAX_PENALTY_SLOTS)) return;
 		if (!SystemParam.isPenaltyValid(value)) return;
 		pen[gateIndex] = value;
 	}
@@ -173,6 +179,14 @@ public class Bib {
 	public long getFinish() {
 		return finish;
 	}
+
+	public void setFinishFirst(long chrono) {
+		this.finishFirst = chrono;
+	}
+
+	public long getFinishFirst() {
+		return finishFirst;
+	}
 	
 	public void setStart(long chrono) {
 		this.start = chrono;
@@ -180,14 +194,14 @@ public class Bib {
 
 	
 	public boolean allPenaltyEmpty() {
-		for (int i=0; i<SystemParam.GATE_COUNT; i++) 
+		for (int i=0; i<SystemParam.MAX_PENALTY_SLOTS; i++) 
 			if (pen[i]>-1) return false;
 		return true;
 	}
 	
 	public String penaltyToSMSString() {
 		StringBuffer sb = new StringBuffer();
-		for (int i=0; i<SystemParam.GATE_COUNT; i++) 
+		for (int i=0; i<SystemParam.MAX_PENALTY_SLOTS; i++) 
 			if (pen[i]>-1) sb.append(" "+(i+1)+":"+pen[i]);
 			
 		// the space between the bib number and the rest is included in the rest

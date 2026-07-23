@@ -30,6 +30,14 @@ public:
     bool setFinishTime(qint64 finishTime);
     QString finishTimeStr() const;
 
+    qint64 finishTimeFirst() const { return _finishTimeFirst; }
+    bool setFinishTimeFirst(qint64 finishTimeFirst);
+    QString finishTimeFirstStr() const;
+
+    /** Écart Arrivée 3 − Arrivée 1 (patrouille). */
+    qint64 timeGap() const;
+    QString timeGapStr() const;
+
     qint64 runningTime() const;
     QString runningTimeStr() const;
 
@@ -77,6 +85,7 @@ private:
     int _entry;
     qint64 _startTime;
     qint64 _finishTime;
+    qint64 _finishTimeFirst;
     QHash<int, Penalty> _penaltyList;
     QHash<int, qint64> _lapTimeList;
     

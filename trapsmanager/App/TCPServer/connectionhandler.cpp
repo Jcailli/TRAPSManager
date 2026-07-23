@@ -238,7 +238,8 @@ void ConnectionHandler::read() {
                 int bib = rootObject.value("bib").toInt();
                 if (bib<1) replyError();
                 qint64 finishTime = (qint64)(rootObject.value("time").toVariant().toULongLong());
-                emit incomingFinishTime(bib, finishTime);
+                int finishRole = rootObject.value("finishRole").toInt(3);
+                emit incomingFinishTime(bib, finishTime, finishRole);
                 response.insert("response", 0);
                 break;
             }

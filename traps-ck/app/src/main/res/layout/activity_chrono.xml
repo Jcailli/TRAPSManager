@@ -1,3 +1,4 @@
+<?xml version="1.0" encoding="utf-8"?>
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools"
     android:id="@+id/LinearLayout1"
@@ -66,6 +67,19 @@
                         android:textStyle="bold"
                         android:typeface="monospace" />
 
+                    <TextView
+                        android:id="@+id/textViewChronoFirst"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:background="#DDDDDD"
+                        android:gravity="center"
+                        android:text=""
+                        android:textColor="#000"
+                        android:textSize="28sp"
+                        android:textStyle="bold"
+                        android:typeface="monospace"
+                        android:visibility="gone" />
+
                     <Button
                         android:id="@+id/lapButton"
                         android:layout_width="match_parent"
@@ -75,14 +89,38 @@
                         android:textColor="#000000"
                         android:textSize="45sp"
                         android:textStyle="bold" />
+
+                    <Button
+                        android:id="@+id/lapButtonFirst"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="8dp"
+                        android:background="@drawable/chronobutton"
+                        android:text="\nARRIVÉE 1\n "
+                        android:textColor="#000000"
+                        android:textSize="36sp"
+                        android:textStyle="bold"
+                        android:visibility="gone" />
+
+                    <Button
+                        android:id="@+id/lapButtonThird"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="8dp"
+                        android:background="@drawable/chronobutton"
+                        android:text="\nARRIVÉE 3\n "
+                        android:textColor="#000000"
+                        android:textSize="36sp"
+                        android:textStyle="bold"
+                        android:visibility="gone" />
    
     <LinearLayout
-        
+        android:id="@+id/chronoNavRow"
         android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:orientation="horizontal"
-        
-      >
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:minHeight="96dp"
+        android:orientation="horizontal">
 
  <ImageButton
           android:id="@+id/chrono_previous_button"
@@ -93,8 +131,6 @@
           android:background="#000000"
           android:scaleType="centerInside"
           android:src="@drawable/button_prevbib" />
-
-
 
         <ImageButton
             android:id="@+id/chrono_next_button"

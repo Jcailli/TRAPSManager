@@ -24,6 +24,7 @@ void Bib::init(int number, char letter) {
     buildId();
     _startTime = 0;
     _finishTime = 0;
+    _finishTimeFirst = 0;
     _locked = false;
     _timestamp = 0;
 
@@ -35,6 +36,7 @@ Bib::Bib(const QString& id, const QJsonObject &json) :
     _id(id),
     _startTime(0),
     _finishTime(0),
+    _finishTimeFirst(0),
     _locked(false),
     _timestamp(0)
 {
@@ -95,6 +97,31 @@ QString Bib::finishTimeStr() const {
     if (_finishTime<1) return "-";
     QDateTime time = QDateTime::fromMSecsSinceEpoch(_finishTime);
     return time.toString("HH:mm:ss.zzz");
+}
+
+bool Bib::setFinishTimeFirst(qint64 finishTimeFirst) {
+    if (locked()) return false;
+    _finishTimeFirst = finishTimeFirst;
+    return true;
+}
+
+QString Bib::finishTimeFirstStr() const {
+    if (_finishTimeFirst<1) return "-";
+    QDateTime time = QDateTime::fromMSecsSinceEpoch(_finishTimeFirst);
+    return time.toString("HH:mm:ss.zzz");
+}
+
+qint64 Bib::timeGap() const {
+    if (_finishTimeFirst < 1 || _finishTime < 1) return 0;
+    qint64 gap = _finishTime - _finishTimeFirst;
+    return gap < 0 ? -gap : gap;
+}
+
+QString Bib::timeGapStr() const {
+    qint64 gap = timeGap();
+    if (gap < 1) return "-";
+    QTime time = QTime(0, 0).addMSecs(static_cast<int>(gap));
+    return time.toString("mm:ss.zzz");
 }
 
 qint64 Bib::runningTime() const {
@@ -172,8 +199,9 @@ void Bib::clearPenalties() {
 }
 
 void Bib::clearChronos() {
-    setStartTime(0);
-    setFinishTime(0);
+    _startTime = 0;
+    _finishTime = 0;
+    _finishTimeFirst = 0;
 }
 
 QString Bib::toString() {
@@ -195,9 +223,11 @@ QJsonObject Bib::jsonLock() const {
 }
 
 QJsonObject Bib::jsonTime(qint64 timestamp) const {
+    Q_UNUSED(timestamp);
     QJsonObject obj;
     obj.insert("startTime", _startTime);
     obj.insert("finishTime", _finishTime);
+    obj.insert("finishTimeFirst", _finishTimeFirst);
     return obj;
 }
 

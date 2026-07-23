@@ -39,6 +39,7 @@ import android.net.Uri;
 import android.provider.Settings;
 
 import com.traps.trapsapp.core.Bib;
+import com.traps.trapsapp.core.CompetitionModeHelper;
 import com.traps.trapsapp.core.PenaltyPad;
 import com.traps.trapsapp.core.TrapsDB;
 import com.traps.trapsapp.core.Utility;
@@ -67,6 +68,8 @@ public class PenaltyActivity extends AppCompatActivity implements DialogInterfac
 	private TRAPSManagerThread trapsManager;
 
 	private AlertDialog sendPenaltyConfirmDialog;
+	private ImageButton lockButton;
+	private boolean uiLocked = false;
 
 	private SoundPool soundPool;
 	public int sndHighPitch;
@@ -97,7 +100,9 @@ public class PenaltyActivity extends AppCompatActivity implements DialogInterfac
         // Set content view based on the mode
         if (TerminalConfigActivity.LAYOUT_MODE_KCROSS.equals(penaltyLayoutMode)) {
             setContentView(R.layout.terminal2_kcross);
-        } else { // Default to slalom
+        } else if (CompetitionModeHelper.isPatrol(this)) {
+            setContentView(R.layout.terminal2_patrol);
+        } else {
             setContentView(R.layout.terminal2);
         }
 
@@ -135,6 +140,8 @@ public class PenaltyActivity extends AppCompatActivity implements DialogInterfac
 		String title = "PENALITÉS ";
         if (TerminalConfigActivity.LAYOUT_MODE_KCROSS.equals(penaltyLayoutMode)) {
             title += "KCROSS ";
+        } else if (CompetitionModeHelper.isPatrol(this)) {
+            title += "PATROUILLE ";
         } else {
             title += "SLALOM ";
         }
@@ -148,7 +155,6 @@ public class PenaltyActivity extends AppCompatActivity implements DialogInterfac
 		//bibText.setTextSize(TypedValue.COMPLEX_UNIT_PX, screenHeight / 7);
 
 		ImageButton prevButton = (ImageButton) findViewById(R.id.previous_button);
-		prevButton.setMaxHeight(1);
 		prevButton.setOnClickListener(new View.OnClickListener() {
 			public void onClick(View v) {
 				prevBib();
@@ -156,13 +162,21 @@ public class PenaltyActivity extends AppCompatActivity implements DialogInterfac
 			}
 		});
 		ImageButton nextButton = (ImageButton) findViewById(R.id.next_button);
-		nextButton.setMaxHeight(1);
 		nextButton.setOnClickListener(new View.OnClickListener() {
 			public void onClick(View v) {
 				nextBib();
 
 			}
 		});
+
+		lockButton = (ImageButton) findViewById(R.id.lockImageButton);
+		if (lockButton != null) {
+			lockButton.setOnClickListener(new View.OnClickListener() {
+				public void onClick(View v) {
+					toggleLock();
+				}
+			});
+		}
 
 		String stringArray[] = new String[bibList.size()];
 		for (int index = 0; index < stringArray.length; index++) {
@@ -342,6 +356,39 @@ public class PenaltyActivity extends AppCompatActivity implements DialogInterfac
 	/**
 	 * Paint the current bib (bibIndex is the current index)
 	 */
+	private void setUiLocked(boolean locked) {
+		uiLocked = locked;
+		penPad.setPadLocked(locked);
+		if (lockButton != null) {
+			lockButton.setImageResource(locked ? R.drawable.chronolock : R.drawable.chronounlock);
+		}
+	}
+
+	private void persistLock(boolean locked) {
+		Bib bib = bibList.get(bibIndex);
+		bib.setLocked(locked);
+		db.updateBibLock(bib.getBibnumber(), locked);
+		setUiLocked(locked);
+	}
+
+	private void toggleLock() {
+		if (uiLocked) {
+			new AlertDialog.Builder(this)
+					.setTitle("Déverrouiller")
+					.setMessage("Déverrouiller les pénalités pour les modifier ?")
+					.setPositiveButton(getTString(R.string.OK), new DialogInterface.OnClickListener() {
+						@Override
+						public void onClick(DialogInterface dialog, int which) {
+							persistLock(false);
+						}
+					})
+					.setNegativeButton(getTString(R.string.cancel), null)
+					.show();
+		} else {
+			persistLock(true);
+		}
+	}
+
 	private void paintBib() {
 		if (bibIndex >= bibList.size()) {
 			Log.e("TerminalActivity", "bibIndex out of range: " + bibIndex);
@@ -352,7 +399,7 @@ public class PenaltyActivity extends AppCompatActivity implements DialogInterfac
 		}
 		spinner.setSelection(bibIndex);
 		penPad.setPenaltyMap(bib.getPenaltyMap(null));
-
+		setUiLocked(bib.isLocked());
 	}
 
 	public void closeTerminal() {
@@ -441,6 +488,9 @@ public class PenaltyActivity extends AppCompatActivity implements DialogInterfac
 				play(sndOKPitch);
 		}
 
+		setUiLocked(true);
+		bib.setLocked(true);
+		db.updateBibLock(bib.getBibnumber(), true);
 		bibIndex = changeIndex;
 		//bibText.setText(bib.getStringBibnumber());
 	}

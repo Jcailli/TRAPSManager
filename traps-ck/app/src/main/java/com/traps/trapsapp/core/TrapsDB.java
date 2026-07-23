@@ -13,7 +13,7 @@ import android.util.SparseIntArray;
 public class TrapsDB {
 	
 	/**************************************************/
-	private static final int DATABASE_VERSION = 22;
+	private static final int DATABASE_VERSION = 23;
 	/**************************************************/
 	
 	private static final String DATABASE_NAME = "trapsck.db";
@@ -38,8 +38,10 @@ public class TrapsDB {
 	
 	private static final String COLUMN_NAME_ASSIGN_GATE = "assigngate";
 	
-	public final static int MAX_GATE_COUNT = 25;
+	public final static int MAX_GATE_COUNT = 75; // GATE_COUNT×3 patrouille
 	public final static int MAX_GATE_TERMINAL_COUNT = 5;
+	
+	private static final String COLUMN_NAME_FINISH_FIRST = "finish_first";
 	
 	private static TrapsDB instance = null;
 	
@@ -73,7 +75,8 @@ public class TrapsDB {
 			}			
 			sql.append(COLUMN_NAME_LOCK + " INTEGER, ");
 			sql.append(COLUMN_NAME_START + " INTEGER, ");
-			sql.append(COLUMN_NAME_FINISH + " INTEGER);");
+			sql.append(COLUMN_NAME_FINISH + " INTEGER, ");
+			sql.append(COLUMN_NAME_FINISH_FIRST + " INTEGER);");
 			Log.i("SQL", sql.toString());
 			db.execSQL(sql.toString());
 			
@@ -196,6 +199,7 @@ public class TrapsDB {
 		map.put(COLUMN_NAME_LOCK, 0);
 		map.put(COLUMN_NAME_START, 0);
 		map.put(COLUMN_NAME_FINISH, 0);
+		map.put(COLUMN_NAME_FINISH_FIRST, 0);
 		for (int index=0; index<MAX_GATE_COUNT; index++) {
 			map.put(COLUMN_NAME_GATEINDEX+(index),-1);
 		}
@@ -231,7 +235,7 @@ public class TrapsDB {
 
 			//Log.i("TrapsDB", "Read row with bib="+bibnumber);
 			Bib bib = new Bib(bibnumber, rank++);
-			for (int index=0; index<SystemParam.GATE_COUNT; index++) {
+			for (int index=0; index<MAX_GATE_COUNT; index++) {
 			//	int penalty = cursor.getInt(cursor.getColumnIndex(COLUMN_NAME_GATEINDEX+(index)));
 				int gateIndexColumn = cursor.getColumnIndex(COLUMN_NAME_GATEINDEX + index);
 				int penalty = 0; // Valeur par défaut
@@ -280,6 +284,14 @@ public class TrapsDB {
 
 			bib.setStart(start);
 			bib.setFinish(finish);
+
+			int finishFirstColumnIndex = cursor.getColumnIndex(COLUMN_NAME_FINISH_FIRST);
+			long finishFirst = 0L;
+			if (finishFirstColumnIndex != -1) {
+				finishFirst = cursor.getLong(finishFirstColumnIndex);
+			}
+			bib.setFinishFirst(finishFirst);
+
 			bibList.add(bib);	
 		}
 		cursor.close();
@@ -425,8 +437,13 @@ public class TrapsDB {
 	
 	public void updateBibChrono(int chronoType, int bibnumber, long chrono) {
 		ContentValues contentValues = new ContentValues(1);
-		if (chronoType==Bib.CHRONO_START) contentValues.put(COLUMN_NAME_START, chrono);
-		else contentValues.put(COLUMN_NAME_FINISH, chrono);
+		if (chronoType == Bib.CHRONO_START) {
+			contentValues.put(COLUMN_NAME_START, chrono);
+		} else if (chronoType == Bib.CHRONO_FINISH_FIRST) {
+			contentValues.put(COLUMN_NAME_FINISH_FIRST, chrono);
+		} else {
+			contentValues.put(COLUMN_NAME_FINISH, chrono);
+		}
 		SQLiteDatabase db = dbHelper.getWritableDatabase();
 		int row = db.update(TABLE_NAME_PENALTIES, contentValues, COLUMN_NAME_BIB+"="+bibnumber, null);
 		System.out.println("Updated rows: "+ row);

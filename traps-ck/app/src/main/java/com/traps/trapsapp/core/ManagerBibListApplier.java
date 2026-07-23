@@ -2,7 +2,6 @@ package com.traps.trapsapp.core;
 
 import android.content.Context;
 import android.util.Log;
-import android.util.SparseArray;
 
 import org.json.JSONArray;
 import org.json.JSONObject;
@@ -12,7 +11,8 @@ import java.util.List;
 
 /**
  * Applique une commande Manager {@code loadBibList} : remplace la liste de
- * dossards en conservant pénalités / chronos / cadenas des dossards encore présents.
+ * dossards. Les pénalités, chronos et cadenas sont réinitialisés
+ * (aucune conservation des données locales des dossards précédents).
  */
 public final class ManagerBibListApplier {
 
@@ -105,31 +105,11 @@ public final class ManagerBibListApplier {
             return -1;
         }
 
-        SparseArray<Bib> previous = new SparseArray<Bib>();
-        ArrayList<Bib> oldList = db.getBibList();
-        if (oldList != null) {
-            for (Bib b : oldList) {
-                previous.put(b.getBibnumber(), b);
-            }
-        }
-
         db.clearBibs();
         db.createBibListInteger(numbers, null);
 
-        for (Integer bibNumber : numbers) {
-            Bib old = previous.get(bibNumber);
-            if (old == null) {
-                continue;
-            }
-            db.updateBibPenalty(bibNumber, old.getPenaltyMap((java.util.Set<Integer>) null));
-            db.updateBibLock(bibNumber, old.isLocked());
-            if (old.getStart() > 0) {
-                db.updateBibChrono(0, bibNumber, old.getStart());
-            }
-            if (old.getFinish() > 0) {
-                db.updateBibChrono(1, bibNumber, old.getFinish());
-            }
-        }
+        // Intentionnellement : pas de restauration pénalités / chronos / cadenas.
+        // Une nouvelle liste Manager repart sur des dossards vides.
 
         synchronized (LOCK) {
             lastEntries = entries;

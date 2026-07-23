@@ -494,17 +494,25 @@ void BibList::processIncomingStartTime(int bibnumber, qint64 startTime) {
 
 }
 
-void BibList::processIncomingFinishTime(int bibnumber, qint64 finishTime) {
-    qDebug() << "Biblist processing incoming finish time for bib " << bibnumber;
+void BibList::processIncomingFinishTime(int bibnumber, qint64 finishTime, int finishRole) {
+    qDebug() << "Biblist processing incoming finish time for bib " << bibnumber << " role=" << finishRole;
     Bib* bib = bibWithIdNumber(bibnumber);
     if (bib==0) {
         qWarning() << QString("Cannot find bib id %0 in the list. Ignore.").arg(bibnumber);
         return;
     }
-    if (bib->setFinishTime(finishTime)) {
+    bool ok = false;
+    if (finishRole == 1)
+        ok = bib->setFinishTimeFirst(finishTime);
+    else
+        ok = bib->setFinishTime(finishTime); // 3ème / défaut
+
+    if (ok) {
         _db.setValue(DB_TIMES, bib->id(), bib->jsonTime());
-        int runningTime = bib->runningTime();
-        if (runningTime>0) emit chronoReceived(bibnumber, runningTime);
+        if (finishRole != 1) {
+            int runningTime = bib->runningTime();
+            if (runningTime>0) emit chronoReceived(bibnumber, runningTime);
+        }
         int bibRow = bibIndex(bib->id());
         emit dataChanged(createIndex(bibRow, 0), createIndex(bibRow, 0));
     }
@@ -659,6 +667,7 @@ void BibList::reloadFromDataBase() {
         QJsonObject bibObj = bibs.value(bibId);
         Bib* bib = new Bib(bibId, bibObj);
         bib->setFinishTime((qint64)times.value(bibId).value("finishTime").toDouble());
+        bib->setFinishTimeFirst((qint64)times.value(bibId).value("finishTimeFirst").toDouble());
         bib->setStartTime((qint64)times.value(bibId).value("startTime").toDouble());
         QJsonArray penaltyArray = penalties.value(bibId).value("penaltyList").toArray();
         foreach (QJsonValue jsonValue, penaltyArray) {
@@ -715,6 +724,8 @@ QVariant BibList::data(const QModelIndex &index, int role) const {
         case BibList::BibLocked : return QVariant(bib->locked());
         case BibList::BibStartTime : return QVariant(bib->startTimeStr());
         case BibList::BibFinishTime : return QVariant(bib->finishTimeStr());
+        case BibList::BibFinishTimeFirst : return QVariant(bib->finishTimeFirstStr());
+        case BibList::BibTimeGap : return QVariant(bib->timeGapStr());
         case BibList::BibRunningTime : return QVariant(bib->runningTimeStr());
 
     }
@@ -727,6 +738,8 @@ QHash<int, QByteArray> BibList::roleNames() const {
     hash.insert(BibList::BibId, BIB_ID_NAME);
     hash.insert(BibList::BibStartTime, BIB_STARTTIME_NAME);
     hash.insert(BibList::BibFinishTime, BIB_FINISHTIME_NAME);
+    hash.insert(BibList::BibFinishTimeFirst, BIB_FINISHTIME_FIRST_NAME);
+    hash.insert(BibList::BibTimeGap, BIB_TIMEGAP_NAME);
     hash.insert(BibList::BibSchedule, BIB_SCHEDULE_NAME);
     hash.insert(BibList::BibCateg, BIB_CATEG_NAME);
     hash.insert(BibList::BibRunningTime, BIB_RUNNINGTIME_NAME);

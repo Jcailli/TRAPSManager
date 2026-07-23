@@ -167,7 +167,9 @@ FocusScope {
             schedule: scheduleData==""?"?":scheduleData
             startTime: startTimeData
             finishTime: finishTimeData
+            finishTimeFirst: finishTimeFirstData
             finishTimeThird: finishTimeData
+            timeGap: timeGapData
             runningTime: runningTimeData
             selected: index>=_firstRowSelected && index<=_lastRowSelected
             locked: lockedData

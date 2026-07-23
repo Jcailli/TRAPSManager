@@ -8,6 +8,8 @@ import java.util.Date;
 import java.util.Locale;
 
 
+import android.app.AlertDialog;
+import android.content.DialogInterface;
 import android.content.SharedPreferences;
 import android.content.pm.ActivityInfo;
 import android.media.AudioManager;
@@ -43,6 +45,7 @@ import android.net.Uri;
 import android.provider.Settings;
 
 import com.traps.trapsapp.core.Bib;
+import com.traps.trapsapp.core.CompetitionModeHelper;
 import com.traps.trapsapp.core.SystemParam;
 import com.traps.trapsapp.core.TrapsDB;
 import com.traps.trapsapp.core.Utility;
@@ -55,13 +58,15 @@ public class ChronoActivity extends AppCompatActivity {
 	private static SimpleDateFormat dateFormatter1 = new SimpleDateFormat("HH:mm:ss", Locale.US);
 		 
 	private int bibIndex = 0;
-	private int chronoType = 0;  // 0=start, 1=finish
+	private int chronoType = 0;  // 0=start, 1=finish (legacy / 3ème)
 	private boolean lock = false;
+	private boolean patrolFinishMode = false;
+	/** Après déverrouillage manuel : autorise de reprendre A1 et A3 sans re-cadenas auto. */
+	private boolean editingUnlocked = false;
 
 	private boolean smsEnabled = false;
 	private boolean transferEnabled = false;
 	private SmsManager smsManager = SmsManager.getDefault();
-	// destination address
 	private String dAddress;
 	private TRAPSManagerThread trapsManager;
 	private SharedPreferences settings;
@@ -70,13 +75,17 @@ public class ChronoActivity extends AppCompatActivity {
 	private Spinner spinner;
 	private TrapsDB db;
 	private TextView chronoTextView;
+	private TextView chronoFirstTextView;
 	private TextView runningTextView;
 	private ImageButton lockButton;
 	private Button lapButton;
+	private Button lapButtonFirst;
+	private Button lapButtonThird;
 	private Handler handler = new Handler();
 	private Runnable runnable;
 	private boolean autodetect = true;
 	private InetSocketAddress lanAddress;
+	private int pendingChronoType = -1;
 
 	private SoundPool soundPool;
 	public int sndHighPitch;
@@ -85,7 +94,6 @@ public class ChronoActivity extends AppCompatActivity {
 	protected void onCreate(Bundle savedInstanceState) {
 		super.onCreate(savedInstanceState);
 		setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_PORTRAIT);
-		// if permanent menu key, remove title 
 		if(Build.VERSION.SDK_INT <= 10 || (Build.VERSION.SDK_INT >= 14 &&    
                 ViewConfiguration.get(this).hasPermanentMenuKey())) {
 			requestWindowFeature(Window.FEATURE_NO_TITLE);
@@ -96,30 +104,22 @@ public class ChronoActivity extends AppCompatActivity {
 				WindowManager.LayoutParams.FLAG_FULLSCREEN);  
 	
 		settings = getSharedPreferences("SETTINGS_TRANSFER", MODE_PRIVATE);
-		dAddress = settings.getString(TerminalConfigActivity.KEY_SMS_ADDRESS,
-				"");
-		
-		Log.i("DAddress", dAddress);
-		smsEnabled = settings.getBoolean(
-				TerminalConfigActivity.KEY_SMS_ENABLED, false);
-		transferEnabled = settings.getBoolean(
-				TerminalConfigActivity.KEY_TRANSFER_ENABLED, false);
+		dAddress = settings.getString(TerminalConfigActivity.KEY_SMS_ADDRESS, "");
+		smsEnabled = settings.getBoolean(TerminalConfigActivity.KEY_SMS_ENABLED, false);
+		transferEnabled = settings.getBoolean(TerminalConfigActivity.KEY_TRANSFER_ENABLED, false);
 		chronoType = getIntent().getExtras().getInt("chronoType", 0);
+		patrolFinishMode = (chronoType == 1) && CompetitionModeHelper.isPatrol(this);
 				
-		autodetect = settings.getBoolean(TerminalConfigActivity.KEY_AUTODETECT,
-				true);
+		autodetect = settings.getBoolean(TerminalConfigActivity.KEY_AUTODETECT, true);
 		lanAddress = new InetSocketAddress(settings.getString(
 				TerminalConfigActivity.KEY_IP_ADDRESS, ""), settings.getInt(
 				TerminalConfigActivity.KEY_PORT, 8080));
 
-		Log.i("smsEnabled", smsEnabled ? "true" : "false");
-		Log.i("transferEnabled", transferEnabled ? "true" : "false");
-		
 		String title = "CHRONO ";
+		if (patrolFinishMode) title += "PATROUILLE ";
 		if (smsEnabled && transferEnabled) title += "SMS";
 		else if (transferEnabled) title += "WIFI";
 		setTitle(title);
-		
 		
 		db = TrapsDB.getInstance();
 		bibList = db.getBibList();
@@ -133,58 +133,82 @@ public class ChronoActivity extends AppCompatActivity {
 		spinner = (Spinner) findViewById(R.id.chronoSpinner); 
 		spinner.setAdapter(adapter);
 		spinner.setOnItemSelectedListener(new OnItemSelectedListener() {
-
 			@Override
-			public void onItemSelected(AdapterView<?> arg0, View arg1,
-					int arg2, long arg3) {
+			public void onItemSelected(AdapterView<?> arg0, View arg1, int arg2, long arg3) {
 				changeBib(arg2);
-				
 			}
-
 			@Override
 			public void onNothingSelected(AdapterView<?> arg0) {
-				// TODO Auto-generated method stub
-				
 			}
 		}); 
 		
 		chronoTextView = (TextView)findViewById(R.id.textViewChrono);
+		chronoFirstTextView = (TextView)findViewById(R.id.textViewChronoFirst);
 		
 		ImageButton prevButton = (ImageButton) findViewById(R.id.chrono_previous_button);
 		prevButton.setOnClickListener(new View.OnClickListener() {
-			public void onClick(View v) {
-				prevBib();
-
-			}
+			public void onClick(View v) { prevBib(); }
 		});
 		ImageButton nextButton = (ImageButton) findViewById(R.id.chrono_next_button);
 		nextButton.setOnClickListener(new View.OnClickListener() {
-			public void onClick(View v) {
-				nextBib();
-
-			}
+			public void onClick(View v) { nextBib(); }
 		});
 	
 		lockButton = (ImageButton) findViewById(R.id.lockImageButton);
 		lockButton.setOnClickListener(new View.OnClickListener() {
-			public void onClick(View v) { 
-				setLock(!lock);
+			public void onClick(View v) {
+				if (lock) {
+					new AlertDialog.Builder(ChronoActivity.this)
+							.setTitle("Déverrouiller")
+							.setMessage("Déverrouiller pour reprendre un temps ?")
+							.setPositiveButton(R.string.OK, new DialogInterface.OnClickListener() {
+								@Override
+								public void onClick(DialogInterface dialog, int which) {
+									editingUnlocked = true;
+									setLock(false);
+								}
+							})
+							.setNegativeButton(R.string.cancel, null)
+							.show();
+				} else {
+					editingUnlocked = false;
+					setLock(true);
+				}
 			}
 		});
 		
 		lapButton = (Button)findViewById(R.id.lapButton);
-		if (chronoType==0) lapButton.setText("\nDÉPART\n");
-		else lapButton.setText("\nARRIVÉE\n");
-		lapButton.setOnClickListener(new View.OnClickListener() {
-			
-			@Override
-			public void onClick(View v) {
-				lapButtonPressed();
-				
-			}
-		}); 
+		lapButtonFirst = (Button)findViewById(R.id.lapButtonFirst);
+		lapButtonThird = (Button)findViewById(R.id.lapButtonThird);
+
+		if (patrolFinishMode) {
+			lapButton.setVisibility(View.GONE);
+			lapButtonFirst.setVisibility(View.VISIBLE);
+			lapButtonThird.setVisibility(View.VISIBLE);
+			chronoFirstTextView.setVisibility(View.VISIBLE);
+			lapButtonFirst.setOnClickListener(new View.OnClickListener() {
+				@Override
+				public void onClick(View v) {
+					requestLap(Bib.CHRONO_FINISH_FIRST);
+				}
+			});
+			lapButtonThird.setOnClickListener(new View.OnClickListener() {
+				@Override
+				public void onClick(View v) {
+					requestLap(Bib.CHRONO_FINISH);
+				}
+			});
+		} else {
+			if (chronoType==0) lapButton.setText("\nDÉPART\n");
+			else lapButton.setText("\nARRIVÉE\n");
+			lapButton.setOnClickListener(new View.OnClickListener() {
+				@Override
+				public void onClick(View v) {
+					requestLap(chronoType);
+				}
+			});
+		}
 		
-		// init TRAPSManager
 		trapsManager = new TRAPSManagerThread();
 		if (transferEnabled && !smsEnabled) {
 			trapsManager.start();
@@ -196,20 +220,16 @@ public class ChronoActivity extends AppCompatActivity {
 		
 		runningTextView = (TextView)findViewById(R.id.textViewTime);
 		runnable = new Runnable() {
-
 			    @Override
 			    public void run() {
-			    	
 			    	long currentTime = System.currentTimeMillis()+ SystemParam.timeshift;
 			    	Date date = new Date(currentTime);
-			    	
 			    	runningTextView.setText(" "+dateFormatter1.format(date)+"."+((currentTime/100)%10)+" ");
 			    	handler.postDelayed(runnable, 100);
 			    }
 			  }; 
 
 		handler.postDelayed(runnable, 100);
-		// init sound
 		soundPool = new SoundPool(5, AudioManager.STREAM_MUSIC, 0);
 		sndHighPitch = soundPool.load(this, R.raw.hz600ms100, 1);
 		paintBib();
@@ -218,16 +238,26 @@ public class ChronoActivity extends AppCompatActivity {
 	private void setLock(boolean lock) {
 		this.lock = lock;
 		if (lock) {
-			lapButton.setVisibility(View.INVISIBLE);
+			// GONE : libère l'espace pour garder les flèches accessibles et lisibles
+			lapButton.setVisibility(View.GONE);
+			if (patrolFinishMode) {
+				lapButtonFirst.setVisibility(View.GONE);
+				lapButtonThird.setVisibility(View.GONE);
+			}
 			lockButton.setImageResource(R.drawable.chronolock);
 		}
 		else {
-			lapButton.setVisibility(View.VISIBLE); 
+			if (patrolFinishMode) {
+				lapButton.setVisibility(View.GONE);
+				lapButtonFirst.setVisibility(View.VISIBLE);
+				lapButtonThird.setVisibility(View.VISIBLE);
+			} else {
+				lapButton.setVisibility(View.VISIBLE);
+			}
 			lockButton.setImageResource(R.drawable.chronounlock);
 		}
-		
 	}
-	
+
 	public void play(int id) {
 		soundPool.play(id, 1, 1, 0, 0, 1);
 	}
@@ -237,11 +267,12 @@ public class ChronoActivity extends AppCompatActivity {
 		super.onRequestPermissionsResult(requestCode, permissions, grantResults);
 		if (requestCode == 1001) {
 			if (grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
-				// Permission accordée → relance l’envoi si besoin
-				lapButtonPressed(); // ou ce que tu veux
+				if (pendingChronoType >= 0) {
+					lapButtonPressed(pendingChronoType);
+					pendingChronoType = -1;
+				}
 			} else {
 				if (!ActivityCompat.shouldShowRequestPermissionRationale(this, Manifest.permission.SEND_SMS)) {
-					// L'utilisateur a bloqué définitivement
 					Utility.alert(this, "Permission bloquée",
 						"L'envoi de SMS est désactivé. Veuillez l'activer dans les paramètres de l'application.");
 					Intent intent = new Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS);
@@ -249,62 +280,74 @@ public class ChronoActivity extends AppCompatActivity {
 					intent.setData(uri);
 					startActivity(intent);
 				} else {
-					// Permission refusée
 					Utility.alert(this, "Permission requise", "L'envoi SMS nécessite la permission d'envoyer des SMS.");
 				}
 			}
 		}
 	}
 
-	private void lapButtonPressed() {
+	private void requestLap(final int type) {
+		lapButtonPressed(type);
+	}
+
+	private void lapButtonPressed(int type) {
 		long currentTime = System.currentTimeMillis()+SystemParam.timeshift;
 		Bib bib = bibList.get(bibIndex);
-		bib.setChrono(chronoType, currentTime);
-		// store in db
-		db.updateBibChrono(chronoType, bib.getBibnumber(), bib.getChrono(chronoType));
-		if (transferEnabled) {
-						if (ContextCompat.checkSelfPermission(this, Manifest.permission.SEND_SMS)
-				!= PackageManager.PERMISSION_GRANTED) {
-			// Permission non accordée → la demander
-			ActivityCompat.requestPermissions(this,
-					new String[]{Manifest.permission.SEND_SMS},
-					1001); // code de requête
-			} else {
-			// Permission OK → envoi possible
-			sendChrono(bib);
+
+		if (patrolFinishMode) {
+			if (type == Bib.CHRONO_FINISH_FIRST && bib.getFinish() > 0 && currentTime > bib.getFinish()) {
+				Utility.alert(this, "Arrivée invalide",
+						"L'arrivée 1 ne peut pas être après l'arrivée 3.");
+				return;
 			}
-			
+			if (type == Bib.CHRONO_FINISH && bib.getFinishFirst() > 0 && currentTime < bib.getFinishFirst()) {
+				Utility.alert(this, "Arrivée invalide",
+						"L'arrivée 3 ne peut pas être avant l'arrivée 1.");
+				return;
+			}
 		}
-    	chronoTextView.setText(bib.getChronoStr(chronoType));
-    	chronoTextView.setVisibility(View.VISIBLE);
-		setLock(true);
+
+		bib.setChrono(type, currentTime);
+		db.updateBibChrono(type, bib.getBibnumber(), bib.getChrono(type));
+		if (transferEnabled) {
+			if (ContextCompat.checkSelfPermission(this, Manifest.permission.SEND_SMS)
+				!= PackageManager.PERMISSION_GRANTED) {
+				pendingChronoType = type;
+				ActivityCompat.requestPermissions(this,
+						new String[]{Manifest.permission.SEND_SMS},
+						1001);
+			} else {
+				sendChrono(bib, type);
+			}
+		}
+		refreshChronoLabels(bib);
+		if (patrolFinishMode) {
+			// Re-cadenas auto seulement hors édition manuelle, quand 1 et 3 sont pris
+			if (!editingUnlocked && bib.getFinishFirst() > 0 && bib.getFinish() > 0) {
+				setLock(true);
+			}
+		} else {
+			editingUnlocked = false;
+			setLock(true);
+		}
 		play(sndHighPitch);
 	}
 	
-	private void sendChrono(Bib bib) {
-
-		// SMS
+	private void sendChrono(Bib bib, int type) {
 		if (smsEnabled) {
-
-			String text = bib.chronoToSMSString(chronoType);
-	
+			String text = bib.chronoToSMSString(type);
 			if (!SMS_ACTIVATED) {
 				Log.e("SMS", "SMS IS HARDCODED AS DISABLED !");
 				return;
 			}
-	
 			if (dAddress == "") {
 				Utility.alert(this, "Erreur",
 						"Impossible d'envoyer les chronos: numero destinataire SMS incorrect") ;
 				return;
 			}
-
 			if (PhoneNumberUtils.isWellFormedSmsAddress(dAddress)) {
 				try {
-					Log.i("TerminalActivity", "Sending to " + dAddress + "> "
-							+ text);
-					smsManager
-							.sendTextMessage(dAddress, null, text, null, null);
+					smsManager.sendTextMessage(dAddress, null, text, null, null);
 				} catch (Exception e) {
 					Log.e("SMS", e.getMessage());
 					Utility.alert(this, "Erreur",
@@ -312,94 +355,79 @@ public class ChronoActivity extends AppCompatActivity {
 									+ dAddress);
 				}
 			} else
-				Utility.alert(this, "Erreur", "Numero SMS incorrect:"
-						+ dAddress);
+				Utility.alert(this, "Erreur", "Numero SMS incorrect:" + dAddress);
+		} else {
+			int finishRole = 0;
+			if (type == Bib.CHRONO_FINISH_FIRST) finishRole = 1;
+			else if (type == Bib.CHRONO_FINISH) finishRole = 3;
+			Log.i("Terminal", "Adding chronos for bib " + bib.getBibnumber() + " type=" + type);
+			trapsManager.addPacket(new TRAPSChrono(bib.getBibnumber(), type, bib.getChrono(type), finishRole));
 		}
-		// LAN
-		else {
-			Log.i("Terminal", "Adding chronos for bib " + bib.getBibnumber());
-			trapsManager.addPacket(new TRAPSChrono(bib.getBibnumber(), chronoType, bib.getChrono(chronoType)));
-		}
-		
-
 	}
 
 	private void nextBib() {
-		Log.i("TerminalActivity", "Next bib");
 		int nextIndex = bibIndex + 1;
-		if (nextIndex >= bibList.size()) {
-			nextIndex = 0;
-		}
-
+		if (nextIndex >= bibList.size()) nextIndex = 0;
 		changeBib(nextIndex);
-
 	}
 
 	private void prevBib() {
-		Log.i("TerminalActivity", "Prev bib");
 		int prevIndex = bibIndex - 1;
-		if (prevIndex < 0) {
-			prevIndex = bibList.size() - 1;
-		}
-
+		if (prevIndex < 0) prevIndex = bibList.size() - 1;
 		changeBib(prevIndex);
-
 	}
 
-	/**
-	 * Returns true if the change has been done
-	 * 
-	 * @param index
-	 * @return
-	 */
 	private void changeBib(int index) {
-		
+		editingUnlocked = false;
 		bibIndex = index;
 		paintBib();
-		
-	
 	}
-	// back key is disabled
+
 	public void onBackPressed() {};
 
+	private void refreshChronoLabels(Bib bib) {
+		if (patrolFinishMode) {
+			String first = bib.getChronoStr(Bib.CHRONO_FINISH_FIRST);
+			String third = bib.getChronoStr(Bib.CHRONO_FINISH);
+			chronoFirstTextView.setText(first.isEmpty() ? "Arrivée 1 : —" : ("Arrivée 1 : " + first));
+			chronoTextView.setText(third.isEmpty() ? "Arrivée 3 : —" : ("Arrivée 3 : " + third));
+			chronoTextView.setVisibility(View.VISIBLE);
+			chronoFirstTextView.setVisibility(View.VISIBLE);
+		} else {
+			String chronoStr = bib.getChronoStr(chronoType);
+			chronoTextView.setText(chronoStr);
+			chronoTextView.setVisibility("".equals(chronoStr) ? View.GONE : View.VISIBLE);
+			chronoFirstTextView.setVisibility(View.GONE);
+		}
+	}
 
-	/**
-	 * Paint the current bib (bibIndex is the current index)
-	 */
 	private void paintBib() {
 		if (bibIndex >= bibList.size()) {
 			Log.e("TerminalActivity", "bibIndex out of range: " + bibIndex);
 		}
 		Bib bib = bibList.get(bibIndex);
-		if (bib == null) {
-			Log.e("TerminalActivity", "bib is null");
-		}
-
-		String chronoStr = bib.getChronoStr(chronoType);
-		chronoTextView.setText(chronoStr);
-		if ("".equals(chronoStr)) chronoTextView.setVisibility(View.INVISIBLE);
-		else chronoTextView.setVisibility(View.VISIBLE);
-		if (bib.getChrono(chronoType)>0) {
+		refreshChronoLabels(bib);
+		if (editingUnlocked) {
+			setLock(false);
+		} else if (patrolFinishMode) {
+			if (bib.getFinishFirst() > 0 && bib.getFinish() > 0) setLock(true);
+			else setLock(false);
+		} else if (bib.getChrono(chronoType)>0) {
 			setLock(true);
-		}
-		else {
+		} else {
 			setLock(false);
 		}
-		
 		spinner.setSelection(bibIndex);
 	}
 
 	public void closeTerminal() {
 		trapsManager.stopThread();
 		finish();
-
 	}
 	
-
 	@Override
 	public boolean onOptionsItemSelected(MenuItem item) {
 		int id = item.getItemId();
-		
 		if (id == R.id.exitchrono) {
 			finish();
 			return true;
@@ -409,11 +437,7 @@ public class ChronoActivity extends AppCompatActivity {
 	
 	@Override
 	public boolean onCreateOptionsMenu(Menu menu) {
-		// Inflate the menu; this adds items to the action bar if it is present.
 		getMenuInflater().inflate(R.menu.chrono, menu);
 		return true;
 	}
-
-
-
 }
