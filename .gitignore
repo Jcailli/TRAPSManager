@@ -57,4 +57,5 @@ compile_commands.json
 memory-bank
 # Artefacts build Windows / copies locales
 windows-build/
+dist/
 
