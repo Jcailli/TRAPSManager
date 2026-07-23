@@ -9,6 +9,7 @@ unix:!macx {
 }
 
 HEADERS += \
+    version.h \
     HTTPServer/requestmapper.h \
     HTTPServer/controller/dumpcontroller.h \
     HTTPServer/controller/formcontroller.h \

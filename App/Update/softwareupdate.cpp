@@ -1,4 +1,5 @@
 #include "softwareupdate.h"
+#include "version.h"
 #include <QQmlEngine>
 #include <QDateTime>
 #include <QJsonDocument>
@@ -21,6 +22,7 @@ SoftwareUpdate::SoftwareUpdate(const QString& platform, const QString& downloadL
     _downloadLocation(downloadLocation),
     _appTimestamp(INT_MAX),
     _versionUptodate(false),
+    _appVersion(QStringLiteral(TRAPS_MANAGER_VERSION)),
     _downloading(false)
 
 {
@@ -35,7 +37,13 @@ SoftwareUpdate::SoftwareUpdate(const QString& platform, const QString& downloadL
         if (timestamp>0) {
             _appTimestamp = timestamp;
             qInfo() << "Application timestamp: " << timestamp;
-            _appVersion = obj.value("version").toString();
+            // La version affichée vient de version.h ; le JSON sert aux MAJ distantes.
+            const QString jsonVersion = obj.value("version").toString();
+            if (!jsonVersion.isEmpty() && jsonVersion != _appVersion) {
+                qWarning() << "trapsmanager.json version" << jsonVersion
+                           << "differs from version.h" << _appVersion
+                           << "- using version.h for About dialog";
+            }
             qInfo() << "Application version: " << _appVersion;
             _url = obj.value("url").toString();
             qInfo() << "Remote update info: " << _url;
@@ -47,6 +55,7 @@ SoftwareUpdate::SoftwareUpdate(const QString& platform, const QString& downloadL
     }
     else {
         qWarning() << "Cannot load qrc:/trapsmanager.json";
+        _appDate = QStringLiteral("juillet 2026");
     }
 }
 

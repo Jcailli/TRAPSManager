@@ -1,11 +1,11 @@
 {
-    "elapsedSecondsSinceEpoch": 1538054871,
-    "version": "4.5",
+    "elapsedSecondsSinceEpoch": 1784800800,
+    "version": "4.6",
     "targets": {
-        "windows":"http://www.traps-ck.com/packages/windows/trapsmanager4.5-install.exe",
-        "cocoa":"http://www.traps-ck.com/packages/macos/trapsmanager4.5.dmg",
-        "xcb":"http://www.traps-ck.com/packages/linux/trapsmanager4.5.tar.gz"
+        "windows":"http://www.traps-ck.com/packages/windows/trapsmanager4.6-install.exe",
+        "cocoa":"http://www.traps-ck.com/packages/macos/trapsmanager4.6.dmg",
+        "xcb":"http://www.traps-ck.com/packages/linux/trapsmanager4.6.tar.gz"
     },
-    "whatsnew": "L'application propose des mises à jour.",
+    "whatsnew": "Chargement dossards/portes CompetFFCK, sync grille pénalités, gestion appareils, installateur Windows.",
     "url": "http://www.traps-ck.com/packages/trapsmanager.json"
 }
